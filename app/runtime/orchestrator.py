@@ -3,11 +3,13 @@ from app.schemas.responses import AgentResponse
 from app.runtime.planner import Planner
 from app.tools.registry import ToolRegistry
 from app.tools.implementations.echo_tool import EchoTool
+from app.policies.engine import PolicyEngine
 
 registry = ToolRegistry()
 registry.register(EchoTool())
 
 planner = Planner()
+policy_engine = PolicyEngine()
 
 
 class AgentRuntime:
@@ -16,6 +18,18 @@ class AgentRuntime:
 
         tool_name = plan["tool"]
         tool_payload = plan["payload"]
+
+        policy_decision = policy_engine.evaluate(
+            tool_name=tool_name,
+            payload=tool_payload,
+            dry_run=request.dry_run,
+        )
+
+        if policy_decision.decision == "deny":
+            return AgentResponse(
+                status="blocked",
+                message=policy_decision.reason
+            )
 
         tool = registry.get(tool_name)
         if not tool:
