@@ -1,7 +1,8 @@
 from fastapi import FastAPI
 
+from app.api.routes import health, agent
+
 app = FastAPI()
 
-@app.get("/")
-def root():
-    return {"status": "nucleo ok"}
+app.include_router(health.router)
+app.include_router(agent.router, prefix="/agent")
