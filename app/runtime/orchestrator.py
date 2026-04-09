@@ -1,16 +1,34 @@
 from app.schemas.requests import AgentRequest
 from app.schemas.responses import AgentResponse
+from app.runtime.planner import Planner
+from app.tools.registry import ToolRegistry
+from app.tools.implementations.echo_tool import EchoTool
+
+registry = ToolRegistry()
+registry.register(EchoTool())
+
+planner = Planner()
+
 
 class AgentRuntime:
     def run(self, request: AgentRequest) -> AgentResponse:
-        if request.dry_run:
+        plan = planner.create_plan(request)
+
+        tool_name = plan["tool"]
+        tool_payload = plan["payload"]
+
+        tool = registry.get(tool_name)
+        if not tool:
             return AgentResponse(
-                status="dry_run_success",
-                message=f"Dry run: Agent would process '{request.user_input}'"
+                status="error",
+                message=f"Planner requested unknown tool: {tool_name}"
             )
-        else:
-            # Actual agent logic would go here
-            return AgentResponse(
-                status="success",
-                message=f"Agent processed: '{request.user_input}'"
-            )
+
+        result = tool.run(tool_payload)
+
+        status = "dry_run_success" if request.dry_run else "success"
+
+        return AgentResponse(
+            status=status,
+            message=str(result)
+        )
