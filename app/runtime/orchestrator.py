@@ -3,10 +3,12 @@ from app.schemas.responses import AgentResponse
 from app.runtime.planner import Planner
 from app.tools.registry import ToolRegistry
 from app.tools.implementations.echo_tool import EchoTool
+from app.tools.implementations.system_info_tool import SystemInfoTool
 from app.policies.engine import PolicyEngine
 
 registry = ToolRegistry()
 registry.register(EchoTool())
+registry.register(SystemInfoTool())
 
 planner = Planner()
 policy_engine = PolicyEngine()
