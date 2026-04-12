@@ -1,8 +1,8 @@
 from fastapi import APIRouter
 
 from app.tools.registry import ToolRegistry
-from app.tools.implementations.echo_tool import EchoTool
-from app.tools.implementations.system_info_tool import SystemInfoTool
+from app.tools.local.echo_tool import EchoTool
+from app.tools.local.system_info_tool import SystemInfoTool
 
 router = APIRouter()
 
