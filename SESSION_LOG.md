@@ -49,3 +49,31 @@ EOF
 - Resume audit from runtime/planner.py
 - Continue with policy engine and tools
 - Work from a stable environment (new PC)
+
+## 2026-04-12
+
+- Continued architectural audit:
+  - planner.py
+  - policies/engine.py
+  - tools/registry.py
+  - tools/base.py
+  - tools implementations
+
+- Clarified internal execution flow:
+  Planner → Policy → Registry → Tool.run()
+
+- Broke down Python syntax fundamentals:
+  - class / def
+  - type hints
+  - self / attributes
+  - dict usage
+  - method structure
+
+- Added minimal docstrings to core modules (runtime, planner, policy, tools)
+
+- Fixed structural inconsistency:
+  - removed unused root-level agent.py
+
+- Identified linting issues:
+  - missing docstrings
+  - missing final newline
