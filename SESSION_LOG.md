@@ -86,3 +86,5 @@ EOF
 - API validated: `/tools` and `/agent/run` working
 - Fixed request schema (`user_input` instead of `prompt`)
 - Ready for remote agent phase
+
+- Introduced AgentService layer to decouple API routes from runtime; refactored /agent/run to use service (API → Service → Runtime)
