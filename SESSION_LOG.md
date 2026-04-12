@@ -77,3 +77,12 @@ EOF
 - Identified linting issues:
   - missing docstrings
   - missing final newline
+
+  -## Session: Tools refactor
+
+- Moved tools to `tools/local/` and prepared `tools/remote/`
+- Added `clients/`, `audit/`, `dispatcher.py`
+- Fixed imports (tools.py, orchestrator.py)
+- API validated: `/tools` and `/agent/run` working
+- Fixed request schema (`user_input` instead of `prompt`)
+- Ready for remote agent phase
