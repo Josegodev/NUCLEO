@@ -5,26 +5,26 @@ Endpoint principal para la ejecución de agentes.
 
 Responsable de:
 - Recibir solicitudes HTTP tipadas (AgentRequest)
-- Delegar la ejecución al runtime (AgentRuntime)
+- Delegar la ejecución al service (AgentService)
 - Devolver respuestas estructuradas (AgentResponse)
 
 Flujo:
-HTTP → AgentRequest → runtime.run() → AgentResponse → HTTP
+HTTP → AgentRequest → AgentService → runtime.run() → AgentResponse → HTTP
 
 Notas:
 - No contiene lógica de negocio
 - Actúa como capa de interfaz (API)
-- Toda la ejecución se realiza en el runtime
+- Toda la ejecución se realiza en capas inferiores
 """
 
 from fastapi import APIRouter
 from app.schemas.requests import AgentRequest
 from app.schemas.responses import AgentResponse
-from app.runtime.orchestrator import AgentRuntime
+from app.services.agent_service import AgentService
 
 router = APIRouter()
-runtime = AgentRuntime()
+agent_service = AgentService()
 
 @router.post("/run", response_model=AgentResponse)
 def run_agent(request: AgentRequest):
-    return runtime.run(request)
+    return agent_service.run(request)
