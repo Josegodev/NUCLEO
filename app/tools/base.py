@@ -1,3 +1,8 @@
+"""
+NUCLEO - BASE TOOL
+
+Define la interfaz común que deben implementar todas las tools.
+"""
 class BaseTool:
     name: str
     description: str

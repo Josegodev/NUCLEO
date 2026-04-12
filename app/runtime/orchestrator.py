@@ -1,3 +1,38 @@
+"""
+NUCLEO - AGENT RUNTIME (ORCHESTRATOR)
+
+Motor central de ejecución de agentes.
+
+Responsable de:
+- Transformar una solicitud (AgentRequest) en un plan ejecutable
+- Validar la ejecución mediante políticas (PolicyEngine)
+- Resolver la herramienta adecuada (ToolRegistry)
+- Ejecutar la acción correspondiente (Tool)
+- Devolver una respuesta estructurada (AgentResponse)
+
+Flujo:
+AgentRequest
+    → Planner (create_plan)
+    → PolicyEngine (evaluate)
+    → ToolRegistry (get tool)
+    → Tool (run)
+    → AgentResponse
+
+Componentes:
+- Planner: decide qué acción ejecutar
+- PolicyEngine: controla permisos y seguridad
+- ToolRegistry: mantiene catálogo de herramientas
+- Tools: implementaciones concretas de ejecución
+
+Notas:
+- Soporta modo 'dry_run' para simulación sin ejecución real
+- Todas las acciones pasan por validación de políticas
+- Diseñado para ser extensible (nuevas tools, nuevas policies)
+
+Arquitectura:
+Command Execution Pipeline con control de políticas.
+"""
+
 from app.schemas.requests import AgentRequest
 from app.schemas.responses import AgentResponse
 from app.runtime.planner import Planner
