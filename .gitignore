@@ -1,4 +1,17 @@
+# Entorno virtual
 .venv/
+
+# Python cache
 __pycache__/
 *.pyc
-.env
+
+# Archivos temporales
+*.log
+*.tmp
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Archivos locales
+estructura.txt
