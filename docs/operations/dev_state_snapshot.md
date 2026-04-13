@@ -1,49 +1,87 @@
-## MIGRATION CONTEXT – NUCLEO SYSTEM
+# System Snapshot – NUCLEO
 
-Estoy retomando el desarrollo del sistema NUCLEO en un nuevo entorno Linux.  
-Este proyecto implementa un runtime de agentes con control de políticas para auditoría de sistemas, con una arquitectura preparada para ser distribuida.
+## Purpose
 
-### Estado actual del proyecto
+This document captures the current operational state of the system
+at the moment of migration to a new Linux environment.
 
-- API construida con FastAPI
-- Arquitectura modular con separación clara de capas:
-  - `api/` → rutas HTTP
-  - `runtime/` → orquestación (planner + ejecución)
-  - `policies/` → control de permisos
-  - `tools/` → herramientas ejecutables
-  - `schemas/` → modelos de datos
-- Registry desacoplada basada en instancias de tools
-- Flujo completo validado:
-  request → planner → policy → tool → response
+It reflects real implementation status and recent structural changes.
 
-### Refactor reciente (importante)
+---
 
-- Separación de tools en:
-  - `tools/local/` → ejecución local
-  - `tools/remote/` → reservado para ejecución remota (aún vacío)
-- Eliminación de `tools/implementations/`
-- Creación de nuevas capas:
-  - `clients/` → futura comunicación con agente Windows
-  - `audit/` → logging y trazabilidad
-  - `runtime/dispatcher.py` → preparado para routing de ejecución
+## System Overview
 
-### Tools actuales
+The system is a modular agent runtime built with FastAPI.
 
-- `echo_tool`
-- `system_info_tool`
+Execution pipeline (current implementation):
 
-Ambas:
-- read_only = true
-- funcionando correctamente vía `/agent/run`
+AgentRequest
+→ AgentService
+→ AgentRuntime
+→ Planner
+→ PolicyEngine
+→ ToolRegistry
+→ Tool
+→ AgentResponse
 
-### Endpoints operativos
+---
 
-- `GET /tools` → lista tools disponibles
-- `POST /agent/run` → ejecuta tools mediante runtime
+## Current Architecture
 
-Ejemplo request válido:
+- `api/` → HTTP routes (FastAPI)
+- `runtime/` → execution orchestration
+- `policies/` → execution control
+- `tools/` → executable tools
+- `schemas/` → data models
+
+---
+
+## Recent Refactor
+
+### Tools restructuring
+
+- `tools/local/` → local execution
+- `tools/remote/` → reserved (not implemented yet)
+- removed `tools/implementations/`
+
+### New layers introduced
+
+- `clients/` → planned external communication layer (not active)
+- `audit/` → planned logging and traceability (not active)
+- `runtime/dispatcher.py` → present but not integrated in execution flow
+
+---
+
+## Tools (current)
+
+### echo_tool
+- read_only: true
+- simple echo behavior
+
+### system_info_tool
+- read_only: true
+- returns system metadata
+
+Both:
+- registered in ToolRegistry
+- callable via `/agent/run`
+
+---
+
+## Endpoints
+
+### GET /tools
+Returns list of registered tools
+
+### POST /agent/run
+Executes agent runtime
+
+Example:
+
 ```json
 {
   "user_input": "system info",
   "dry_run": true
 }
+
+TEST_SAVE_ARCHITECTURE_130426

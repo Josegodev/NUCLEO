@@ -1,23 +1,23 @@
 cat > SESSION_LOG.md << 'EOF'
 # Session Log
 
+---
+
 ## 2026-04-10
+
 - Implemented runtime orchestration
 - Added echo and system_info tools
 - Introduced policy layer
-- Refactored tools with metadata (partial)
 - Attempted execution context integration
 - Rolled back due to excessive refactor complexity
 
-## Next session should start with
-- Re-establish stable baseline
-- Introduce changes incrementally
-EOF
+### Rollback
 
-## 2026-04-10 (rollback)
-- Reverted all changes to last stable commit
-- Identified need for persistent project memory
+- Reverted to last stable commit
+- Identified need for controlled incremental changes
 - Introduced project state tracking files
+
+---
 
 ## 2026-04-11
 
@@ -27,64 +27,114 @@ EOF
   - runtime/orchestrator.py
 
 - Clarified system structure:
-  API → Runtime → Planner → Policy → Tools → Response
+  API → AgentService → Runtime → Planner → Policy → Registry → Tool → Response
 
-- Identified key architectural roles:
+- Identified architectural roles:
   - API = entrypoint
+  - AgentService = façade
   - Runtime = orchestrator
   - Planner = decision layer
   - Policy = control layer
   - Tools = execution layer
 
-- Identified current limitations:
+- Identified limitations:
   - no execution tracing
   - global dependencies in runtime
   - simple planner
   - basic policy engine
   - response not structured
 
-- Decided to pause audit due to hardware limitations
+- Paused audit due to hardware limitations
 
-## Next session should start with
-- Resume audit from runtime/planner.py
-- Continue with policy engine and tools
-- Work from a stable environment (new PC)
+---
 
 ## 2026-04-12
 
-- Continued architectural audit:
+- Continued full system audit:
   - planner.py
   - policies/engine.py
   - tools/registry.py
   - tools/base.py
   - tools implementations
 
-- Clarified internal execution flow:
+- Verified execution flow:
   Planner → Policy → Registry → Tool.run()
 
-- Broke down Python syntax fundamentals:
-  - class / def
-  - type hints
-  - self / attributes
-  - dict usage
-  - method structure
+- Added minimal docstrings to core modules
 
-- Added minimal docstrings to core modules (runtime, planner, policy, tools)
-
-- Fixed structural inconsistency:
+- Fixed structural issues:
   - removed unused root-level agent.py
 
-- Identified linting issues:
+- Identified code quality issues:
   - missing docstrings
-  - missing final newline
+  - formatting inconsistencies
 
-  -## Session: Tools refactor
+### Tools Refactor
 
-- Moved tools to `tools/local/` and prepared `tools/remote/`
-- Added `clients/`, `audit/`, `dispatcher.py`
-- Fixed imports (tools.py, orchestrator.py)
-- API validated: `/tools` and `/agent/run` working
-- Fixed request schema (`user_input` instead of `prompt`)
-- Ready for remote agent phase
+- Moved tools to `tools/local/`
+- Prepared `tools/remote/`
+- Added:
+  - `clients/`
+  - `audit/`
+  - `runtime/dispatcher.py`
 
-- Introduced AgentService layer to decouple API routes from runtime; refactored /agent/run to use service (API → Service → Runtime)
+- Fixed imports across modules
+- API validated:
+  - `/tools`
+  - `/agent/run`
+
+- Fixed request schema:
+  - `user_input` instead of `prompt`
+
+- Introduced `AgentService` layer:
+  API → Service → Runtime
+
+---
+
+## 2026-04-13
+
+- Completed full technical audit of core modules:
+  - AgentService
+  - AgentRuntime
+  - Planner
+  - PolicyEngine
+  - ToolRegistry
+  - BaseTool
+
+- Identified critical architectural gaps:
+  - implicit contracts between components
+  - `dry_run` not enforced
+  - no error handling in runtime
+  - tool outputs not structured
+  - policy limited to tool-name whitelist
+
+- Created and aligned documentation:
+  - `docs/architecture.md` (verified behavior)
+  - `docs/evolution_map.md`
+  - `docs/modules/*`
+  - `docs/audits/*`
+
+- Reorganized documentation structure:
+  - separated vision, planning, operations, and audits
+
+- Defined development roadmap:
+  - contracts → control → error handling → decoupling → evolution
+
+---
+
+## Next Session
+
+- Start Phase 1: Contract Reinforcement
+- Add minimal logging in orchestrator:
+  - request_id
+  - selected tool
+  - policy decision
+  - execution result
+
+### Do NOT
+
+- introduce ExecutionContext
+- refactor response structure
+- modify tools deeply
+
+TEST_SAVE_ARCHITECTURE_130426
