@@ -8,6 +8,7 @@ Responsable de:
 - Validar la ejecución mediante políticas (PolicyEngine)
 - Resolver la herramienta adecuada (ToolRegistry)
 - Ejecutar la acción correspondiente (Tool)
+- Propagar el ExecutionContext a policy y tools
 - Devolver una respuesta estructurada (AgentResponse)
 
 Flujo:
@@ -33,6 +34,7 @@ Arquitectura:
 Command Execution Pipeline con control de políticas.
 """
 
+from app.schemas.context import ExecutionContext
 from app.schemas.requests import AgentRequest
 from app.schemas.responses import AgentResponse
 from app.runtime.planner import Planner
@@ -50,7 +52,7 @@ policy_engine = PolicyEngine()
 
 
 class AgentRuntime:
-    def run(self, request: AgentRequest) -> AgentResponse:
+    def run(self, request: AgentRequest, context: ExecutionContext) -> AgentResponse:
         plan = planner.create_plan(request)
 
         tool_name = plan["tool"]
@@ -60,26 +62,27 @@ class AgentRuntime:
             tool_name=tool_name,
             payload=tool_payload,
             dry_run=request.dry_run,
+            context=context,
         )
 
         if policy_decision.decision == "deny":
             return AgentResponse(
                 status="blocked",
-                message=policy_decision.reason
+                message=policy_decision.reason,
             )
 
         tool = registry.get(tool_name)
         if not tool:
             return AgentResponse(
                 status="error",
-                message=f"Planner requested unknown tool: {tool_name}"
+                message=f"Planner requested unknown tool: {tool_name}",
             )
 
-        result = tool.run(tool_payload)
+        result = tool.run(tool_payload, context=context)
 
         status = "dry_run_success" if request.dry_run else "success"
 
         return AgentResponse(
             status=status,
-            message=str(result)
+            message=str(result),
         )

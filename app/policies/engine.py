@@ -7,16 +7,18 @@ puede ser ejecutada.
 Responsable de:
 - Evaluar permisos de ejecución de tools
 - Aplicar reglas de seguridad antes de la ejecución
+- Considerar el contexto de ejecución autenticado
 - Devolver decisiones estructuradas (PolicyDecision)
 
 Flujo:
-tool_name + payload + dry_run
+tool_name + payload + dry_run + context
     → evaluación de reglas
     → PolicyDecision (allow / deny)
 
 Tipo de implementación:
 - Whitelist estática (permitir solo tools explícitas)
 - Estrategia "deny by default"
+- Validación básica por usuario/rol
 
 Salida:
 PolicyDecision:
@@ -31,9 +33,9 @@ Notas:
 - Diseñado para ser extensible (reglas más complejas en el futuro)
 
 Limitaciones actuales:
-- No evalúa payload
-- No diferencia entre dry_run y ejecución real
-- No considera contexto (usuario, entorno, estado)
+- No evalúa payload en profundidad
+- No diferencia todavía reglas avanzadas entre dry_run y ejecución real
+- Control de roles aún básico
 
 Arquitectura:
 Capa de control dentro del pipeline:
@@ -41,17 +43,36 @@ planner → policy → execution
 """
 
 from app.policies.models import PolicyDecision
+from app.schemas.context import ExecutionContext
 
 
 class PolicyEngine:
-    def evaluate(self, tool_name: str, payload: dict, dry_run: bool) -> PolicyDecision:
-        if tool_name in {"echo", "system_info"}:
+    def evaluate(
+        self,
+        tool_name: str,
+        payload: dict,
+        dry_run: bool,
+        context: ExecutionContext,
+    ) -> PolicyDecision:
+        if not context.authenticated:
             return PolicyDecision(
-                decision="allow",
-                reason=f"{tool_name} tool is allowed"
+                decision="deny",
+                reason="unauthenticated request",
+            )
+
+        if tool_name not in {"echo", "system_info"}:
+            return PolicyDecision(
+                decision="deny",
+                reason=f"tool '{tool_name}' is not allowed by policy",
+            )
+
+        if tool_name == "system_info" and "admin" not in context.roles:
+            return PolicyDecision(
+                decision="deny",
+                reason=f"user '{context.username}' is not allowed to run 'system_info'",
             )
 
         return PolicyDecision(
-            decision="deny",
-            reason=f"tool '{tool_name}' is not allowed by policy"
+            decision="allow",
+            reason=f"{tool_name} tool is allowed for user '{context.username}'",
         )
