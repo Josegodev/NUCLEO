@@ -17,13 +17,49 @@ It is based on the current audited implementation.
 
 Current high-level structure (audited):
 
-- `app/main.py`
-- `app/api/routes/`
-- `app/runtime/`
-- `app/policies/`
-- `app/tools/`
-- `app/schemas/`
-- `docs/`
+## Repository Structure (real)
+
+```text
+app/
+  -main.py                    → FastAPI entrypoint; initializes app and registers routes
+
+  api/
+    routes/
+      agent.py              → POST `/agent/run`; ejecuta el agente vía AgentService
+      health.py             → GET `/health`; endpoint de estado (liveness)
+      tools.py              → GET `/tools`; expone tools registradas
+
+  -services/
+    agent_service.py        → Thin façade; delegates execution to AgentRuntime
+
+  -runtime/
+    orchestrator.py         → Core execution pipeline; coordinates planner, policy and tools
+    planner.py              → Rule-based decision logic; maps user_input → tool + payload
+    dispatcher.py           → (planned) execution router; intended to decide where/how tools run
+
+  -policies/
+    engine.py               → Execution control; allow/deny based on tool name
+    models.py               → PolicyDecision schema (decision + reason)
+
+  -tools/
+    base.py                 → Tool interface definition (BaseTool)
+    registry.py             → Tool registry; resolves tools by name
+    local/                  → Concrete tool implementations (e.g., echo, system_info)
+
+  -schemas/
+    requests.py             → AgentRequest model (input contract)
+    responses.py            → AgentResponse model (output contract)
+    execution.py            → Execution models (PlanStep, ToolResult)
+
+docs/
+  -architecture.md           → Verified system behavior (source of truth)
+  -evolution_map.md          → Technical roadmap and evolution priorities
+
+  -modules/                  → Per-module audit documentation (runtime, planner, etc.)
+  -audits/                   → Repository and file-level audits
+  -operations/               → Operational state, session log, snapshots
+  -planning/                 → Development plan and next steps
+  -vision/                   → Target architecture (future design)
 
 ### Structural assessment
 
@@ -68,13 +104,8 @@ Impact:
 - runtime module takes on setup responsibilities
 - dependency injection path is not yet prepared
 
-### 3. Documentation is present but still being aligned with audited behavior
-Some docs started conceptually and now need synchronization with verified implementation.
 
-Impact:
-- risk of drift between code and docs if not maintained carefully
-
-### 4. No dedicated tests structure observed in audited scope
+### 3. No dedicated tests structure observed in audited scope
 A test layout has not yet been established in the reviewed material.
 
 Impact:
@@ -141,4 +172,3 @@ Main risk is not repository chaos, but architectural drift caused by:
 
 The repo foundation is good enough to continue, provided that contracts and composition boundaries are reinforced before major feature growth.
 
-TEST_SAVE_ARCHITECTURE_130426
