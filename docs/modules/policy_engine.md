@@ -42,4 +42,3 @@ Medium
 - Move toward declarative rule definitions
 - Enrich `PolicyDecision` with rule metadata
 
-TEST_SAVE_ARCHITECTURE_130426

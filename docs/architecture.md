@@ -34,4 +34,3 @@ AgentRequest
   ```python
   message = str(result)
 
-  TEST_SAVE_ARCHITECTURE_130426

@@ -38,4 +38,3 @@ Medium-High
 - Add support for `dry_run` or execution context
 - Prepare separation between metadata and execution logic
 
-TEST_SAVE_ARCHITECTURE_130426

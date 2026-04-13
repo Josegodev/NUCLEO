@@ -43,4 +43,3 @@ Medium
 - Reduce string-based coupling with tool names
 - Prepare for rule-table or declarative routing growth
 
-TEST_SAVE_ARCHITECTURE_130426

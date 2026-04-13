@@ -37,4 +37,3 @@ Medium
 - Add helper methods such as `has()` or `list_tool_names()`
 - Prepare registry usage for metadata-based policy and documentation
 
-TEST_SAVE_ARCHITECTURE_130426

@@ -32,4 +32,3 @@ Medium
 - Keep documentation aligned with actual behavior
 - Use this layer as future entrypoint for tracing and execution context
 
-TEST_SAVE_ARCHITECTURE_130426

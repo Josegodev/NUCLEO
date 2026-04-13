@@ -84,4 +84,3 @@ Example:
   "dry_run": true
 }
 
-TEST_SAVE_ARCHITECTURE_130426
