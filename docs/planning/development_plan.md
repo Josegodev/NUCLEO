@@ -100,56 +100,55 @@ Actions:
 
 ---
 
-## Phase 6 — Persistencia (BASE DE DATOS) (MEDIUM PRIORITY)
+## Phase 6 — Persistence (DATABASE) (MEDIUM PRIORITY)
 
 Objective:
-Introducir persistencia para almacenar estado, ejecuciones y trazabilidad del sistema.
+Introduce persistence to store system state, executions, and traceability.
 
-Contexto:
-Actualmente el sistema es completamente stateless.  
-No existe almacenamiento de ejecuciones, resultados ni contexto.
+Context:
+The system is currently fully stateless.  
+There is no storage for executions, results, or context.
 
-Alcance inicial (mínimo, sin sobreingeniería):
+Initial scope (minimal, no overengineering):
 
-- Registrar ejecuciones del runtime:
+- Record runtime executions:
   - request_id
   - user_input
-  - tool seleccionada
-  - decisión de policy
-  - resultado
+  - selected tool
+  - policy decision
+  - result
   - timestamp
 
-- Persistir logs estructurados (alternativa o complemento a logging plano)
+- Persist structured logs (as an alternative or complement to plain logging)
 
-Decisiones técnicas a definir:
+Technical decisions to define:
 
-- Tipo de base de datos:
-  - SQLite (local, simple, recomendado inicio)
-  - PostgreSQL (si se escala a multi-entorno)
+- Database type:
+  - SQLite (local, simple, recommended to start)
+  - PostgreSQL (if scaling to multi-environment)
 
-- Modelo de datos mínimo:
+- Minimal data model:
   - ExecutionRecord
-  - (opcional) ToolExecution
-  - (opcional) PolicyDecisionLog
+  - (optional) ToolExecution
+  - (optional) PolicyDecisionLog
 
-- Estrategia de integración:
-  - NO acoplar directamente al runtime core
-  - introducir capa futura (`storage/` o `persistence/`)
-  - usar interfaz simple (repository pattern ligero)
+- Integration strategy:
+  - DO NOT couple directly to the runtime core
+  - introduce a future layer (`storage/` or `persistence/`)
+  - use a simple interface (lightweight repository pattern)
 
-Restricciones:
+Constraints:
 
-- No introducir ORM complejo en esta fase
-- No romper simplicidad del runtime
-- Persistencia debe ser opcional (feature toggle posible)
+- Do not introduce a complex ORM at this stage
+- Do not break runtime simplicity
+- Persistence must be optional (feature toggle possible)
 
-Impacto esperado:
+Expected impact:
 
-- Trazabilidad real de ejecuciones
-- Base para debugging avanzado
-- Preparación para auditoría y análisis
-- Base futura para memoria/estado (sin implementarlo aún)
-
+- Real execution traceability
+- Foundation for advanced debugging
+- Preparation for auditing and analysis
+- Future base for memory/state (without implementing it yet)
 ---
 
 ## Phase 7 — Planner & Policy Evolution (LOW PRIORITY)
