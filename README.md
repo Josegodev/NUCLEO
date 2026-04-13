@@ -1,103 +1,103 @@
-# NUCLEO
-
-## Visión general
 
 NUCLEO es un runtime de agentes modulares construido sobre FastAPI.
 
 Ejecuta peticiones de usuario a través de un pipeline controlado:
 
-- **Planner** → decide qué herramienta utilizar  
-- **Policy Engine** → valida la ejecución  
-- **Tool Registry** → resuelve la herramienta  
-- **Tool** → ejecuta la acción  
+- Planner → decide qué herramienta utilizar  
+- Policy Engine → valida la ejecución  
+- Tool Registry → resuelve la herramienta  
+- Tool → ejecuta la acción  
 
 **Objetivo:**  
-Proporcionar un sistema de ejecución **controlado y auditable**, evitando comportamientos tipo “caja negra”.
+Proporcionar un sistema de ejecución controlado y auditable, evitando comportamientos tipo “caja negra”.
 
 ---
 
-## Arquitectura (alto nivel)
+## Quick start (2 minutos)
 
-Request  
-→ API  
-→ AgentService  
-→ Runtime  
-→ Planner  
-→ Policy  
-→ ToolRegistry  
-→ Tool  
-→ Response  
+### 1. Instalar dependencias
 
-Para más detalle:
+```bash
+pip install -r requirements.txt
+2. Ejecutar el servidor
+uvicorn app.main:app --reload
+3. Abrir Swagger
+http://127.0.0.1:8000/docs
+Autenticación
 
-- `docs/architecture.md`  
-- `docs/evolution_map.md`  
+El sistema utiliza API Key por request.
 
----
+En Swagger:
 
-## Contexto de ejecución
+Pulsa Authorize
+Introduce:
+dev-jose-key
+Ejemplo de uso
+Request
+{
+  "user_input": "system info",
+  "dry_run": false
+}
+curl
+curl -X POST http://127.0.0.1:8000/agent/run \
+  -H "Authorization: Bearer dev-jose-key" \
+  -H "Content-Type: application/json" \
+  -d '{"user_input": "system info", "dry_run": false}'
+Response (actual)
+{
+  "status": "success",
+  "message": "{'requested_by': 'jose', 'request_id': '...', 'os': 'Windows', ...}"
+}
+Arquitectura 
+Request
+→ API
+→ AgentService
+→ Runtime
+→ Planner
+→ Policy
+→ ToolRegistry
+→ Tool
+→ Response
 
-El sistema expone una API HTTP utilizando FastAPI y es ejecutado mediante Uvicorn.
+Más detalle:
 
-- **FastAPI** define los endpoints, valida las peticiones y estructura las respuestas.  
-- **Uvicorn** actúa como servidor ASGI que ejecuta la aplicación y gestiona las conexiones HTTP.  
+docs/architecture.md
+docs/evolution_map.md
+Flujo de ejecución
 
----
+Cliente HTTP
+↓
+Uvicorn
+↓
+FastAPI (/agent/run)
+↓
+AgentService
+↓
+AgentRuntime
+↓
+Planner → Policy → Tool
+↓
+Respuesta
 
-## Estado del proyecto
+Estado del proyecto
 
 ⚠️ Fase actual: bootstrap
 
-Actualmente:
+Implementado
+Arquitectura modular
+Pipeline de ejecución funcional end-to-end
+Autenticación por API key
+ExecutionContext propagado
+Policy básica basada en roles
+Pendiente
+Response estructurado (actualmente serializado como string)
+Logging / auditoría
+Persistencia (base de datos)
+Mejora del planner
+Validación de payload
+Contexto técnico
 
-- Arquitectura modular definida
-- Pipeline de ejecución funcional end-to-end
-- Auditoría técnica completada
+El sistema expone una API HTTP utilizando FastAPI y es ejecutado mediante Uvicorn.
 
-Pendiente:
-
-- Refuerzo de contratos (ExecutionPlan, schemas)
-- Control de ejecución (`dry_run`)
-- Manejo de errores
-- Persistencia (base de datos)
-- Evolución de planner y policy
-
----
-
-## Ejemplo de uso
-
-### Request
-
-```json
-{
-  "user_input": "system info",
-  "dry_run": true
-}
-
-### Flujo de ejecución
-
-Cliente HTTP  
-↓  
-Uvicorn  
-↓  
-FastAPI (/run endpoint)  
-↓  
-AgentService  
-↓  
-AgentRuntime  
-↓  
-Planner → Policy → Tool  
-↓  
-Respuesta  
-
-### Arranque del sistema
-
-```md
-```bash
-uvicorn app.main:app --reload
-
-
-## Documentación
-
-- Inglés: `docs/`
-- Español: `docs_esp/`
+FastAPI define endpoints, validación y estructura de respuesta
+Uvicorn ejecuta la aplicación como servidor ASGI
