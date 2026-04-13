@@ -42,6 +42,38 @@ El sistema expone una API HTTP utilizando FastAPI y es ejecutado mediante Uvicor
 - **FastAPI** define los endpoints, valida las peticiones y estructura las respuestas.  
 - **Uvicorn** actúa como servidor ASGI que ejecuta la aplicación y gestiona las conexiones HTTP.  
 
+---
+
+## Estado del proyecto
+
+⚠️ Fase actual: bootstrap
+
+Actualmente:
+
+- Arquitectura modular definida
+- Pipeline de ejecución funcional end-to-end
+- Auditoría técnica completada
+
+Pendiente:
+
+- Refuerzo de contratos (ExecutionPlan, schemas)
+- Control de ejecución (`dry_run`)
+- Manejo de errores
+- Persistencia (base de datos)
+- Evolución de planner y policy
+
+---
+
+## Ejemplo de uso
+
+### Request
+
+```json
+{
+  "user_input": "system info",
+  "dry_run": true
+}
+
 ### Flujo de ejecución
 
 Cliente HTTP  
@@ -60,8 +92,10 @@ Respuesta
 
 ### Arranque del sistema
 
+```md
 ```bash
 uvicorn app.main:app --reload
+
 
 ## Documentación
 
