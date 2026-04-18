@@ -85,4 +85,5 @@ class AgentRuntime:
         return AgentResponse(
             status=status,
             message=str(result),
+            result=result,
         )

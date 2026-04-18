@@ -135,3 +135,33 @@
 - introducir ExecutionContext  
 - refactorizar la estructura de respuesta  
 - modificar tools en profundidad  
+
+### Objective
+Preserve structured tool output in the active `nucleo` response path without changing existing response semantics.
+
+### Files modified
+- `nucleo/app/schemas/responses.py`
+- `nucleo/app/runtime/orchestrator.py`
+
+### Problem detected
+`AgentRuntime.run()` was converting structured tool output to `str(result)` before returning `AgentResponse`.
+`AgentResponse` only exposed `status` and `message`, so structured output was lost before leaving the runtime.
+
+### Change applied
+Added an optional `result` field to `AgentResponse` and populated it in `AgentRuntime.run()`.
+Kept `message=str(result)` unchanged for backward compatibility.
+
+### Expected impact
+Existing clients can continue using `message`.
+New clients can consume structured tool output from `result`.
+
+### Risks / limitations
+- The payload is temporarily duplicated in `message` and `result`.
+- Serialization depends on tool outputs remaining JSON-serializable.
+
+### Validation status
+Patch applied.
+Runtime validation not executed in this step.
+
+### Next step
+Validate the `/agent/run` response shape and confirm clients can read `result` without affecting existing consumers.

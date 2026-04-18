@@ -209,3 +209,33 @@ Current response serialization loses structure and makes the API harder to consu
 - `app/tools/base.py`
 - `app/tools/local/system_info_tool.py`
 - `app/tools/local/echo_tool.py`
+
+### [2026-04-18] Change: Preserve structured response in active nucleo runtime
+
+- Objective:
+  Ensure structured tool outputs are not lost before leaving the runtime in the active nucleo application.
+
+- Files modified:
+  - `nucleo/app/schemas/responses.py`
+  - `nucleo/app/runtime/orchestrator.py`
+
+- Problem detected:
+  `AgentRuntime.run()` converted structured tool output to `str(result)` and `AgentResponse` only exposed `status` and `message`, causing loss of machine-readable data.
+
+- Change applied:
+  Added optional `result` field to `AgentResponse` and populated it with the original structured output while preserving `message=str(result)` for backward compatibility.
+
+- Expected impact:
+  API responses now expose both human-readable (`message`) and structured (`result`) outputs, enabling downstream processing and future auditability.
+
+- Risks / limitations:
+  - Payload duplication (`message` + `result`)
+  - Requires tool outputs to remain JSON-serializable
+  - `message` still acts as legacy field
+
+- Validation status:
+  Runtime validated against active nucleo app via HTTP.
+  Response includes structured `result` without breaking existing behavior.
+
+- Next step:
+  Implement real `dry_run` semantics in nucleo runtime (skip tool execution and return preview response).
