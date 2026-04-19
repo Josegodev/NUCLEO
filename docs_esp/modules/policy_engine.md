@@ -1,43 +1,45 @@
+> Archivo origen: `docs/modules/policy_engine.md`
+> Última sincronización: `2026-04-19`
+
 # PolicyEngine
 
+## Capa
+
+Arquitectura verificada
+
 ## Propósito
-Validar si la ejecución de una tool planificada está permitida antes de llegar a la fase de ejecución.
 
-## Comportamiento real
-El policy engine actual aplica una whitelist estática basada en el nombre de la tool.
+Validar si una ejecución planificada de una tool de producción está permitida antes de llegar a la etapa de ejecución.
 
-Comportamiento:
-- Permite `echo`  
-- Permite `system_info`  
-- Deniega cualquier otra tool  
-- Ignora `payload`  
-- Ignora `dry_run`  
+## Comportamiento actual verificado
 
-Devuelve un `PolicyDecision` con:
-- `decision`: `allow` o `deny`  
-- `reason`: string explicativo  
+`PolicyEngine.evaluate(...)` actualmente:
+
+- deniega requests no autenticadas
+- permite `echo`
+- permite `system_info` solo cuando `admin` está presente en los roles
+- deniega cualquier otro nombre de tool
+
+Devuelve una `PolicyDecision` con:
+
+- `decision`
+- `reason`
+
+## Lo que actualmente no hace
+
+- no evalúa el payload en profundidad
+- no impone un `dry_run` con significado real
+- no usa `read_only` ni `risk_level`
+- no gobierna directamente la generación de artefactos del laboratorio
 
 ## Fortalezas
-- Comportamiento real de denegación por defecto  
-- Simple y auditable  
-- Separación clara respecto a la ejecución  
-- Salida estructurada mediante `PolicyDecision`  
 
-## Problemas detectados
-- `payload` no se evalúa  
-- `dry_run` no tiene efecto en las decisiones de policy  
-- La seguridad se basa únicamente en el nombre de la tool, no en capacidades o metadatos  
-- Los nombres de tools hardcodeados generan duplicidad con planner/registry  
-- No existen identificadores estructurados de reglas de policy  
-- No está preparado para control contextual o dependiente de parámetros  
+- forma deny-by-default
+- separación clara respecto a la ejecución
+- el contexto autenticado forma parte del camino de decisión
 
-## Nivel de riesgo
-Medio
+## Etiqueta de estado
 
-## Mejoras recomendadas
-- Documentar explícitamente que actualmente es una allowlist por nombre de tool  
-- Empezar a usar metadatos de tools como `read_only` y `risk_level`  
-- Aplicar restricciones reales basadas en `dry_run`  
-- Preparar validaciones sensibles al payload  
-- Evolucionar hacia definiciones declarativas de reglas  
-- Enriquecer `PolicyDecision` con metadatos de reglas  
+- Autorización de producción: implementada
+- Policy sensible a metadatos: no implementada
+- Control de promoción del laboratorio: no implementado

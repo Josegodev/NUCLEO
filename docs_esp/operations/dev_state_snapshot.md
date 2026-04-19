@@ -1,85 +1,55 @@
-# Snapshot del sistema – NUCLEO
+> Archivo origen: `docs/operations/dev_state_snapshot.md`
+> Última sincronización: `2026-04-19`
+
+# Snapshot del estado de desarrollo - NUCLEO
+
+## Fecha del snapshot
+
+2026-04-19
 
 ## Propósito
 
-Este documento captura el estado operativo actual del sistema
-en el momento de la migración a un nuevo entorno Linux.
+Capturar una vista puntual y concisa del estado del repositorio tras la introducción de la ruta experimental de laboratorio y la pasada de normalización documental.
 
-Refleja el estado real de la implementación y los cambios estructurales recientes.
+## Forma actual verificada del runtime
 
----
+- backend FastAPI
+- autenticación por API key con alcance de request
+- propagación de `ExecutionContext`
+- runtime de producción:
+  - planner
+  - policy
+  - registry
+  - tools
+- tools de producción:
+  - `echo`
+  - `system_info`
+- la respuesta contiene:
+  - `status`
+  - `message`
+  - `result` opcional
 
-## Visión general del sistema
+## Adiciones experimentales verificadas
 
-El sistema es un runtime de agentes modulares construido con FastAPI.
+- `app/domain/tool_proposals/`
+- `app/domain/staging/`
+- `app/services/tool_proposal/`
+- `app/services/tool_generation/`
+- `app/services/staging/`
+- `app/services/audit/`
+- `runtime_lab/`
 
-Pipeline de ejecución (implementación actual):
+Estas adiciones están aisladas de la activación del registry de producción.
 
-AgentRequest  
-→ AgentService  
-→ AgentRuntime  
-→ Planner  
-→ PolicyEngine  
-→ ToolRegistry  
-→ Tool  
-→ AgentResponse  
+## Gaps actuales
 
----
+- el contrato del planner sigue siendo implícito
+- dry-run aún no se impone estructuralmente
+- el modelo de errores del runtime sigue siendo limitado
+- el comportamiento de persistencia de artefactos del laboratorio depende de permisos de escritura del entorno y no se validó completamente en esta sesión del repositorio
 
-## Arquitectura actual
+## Snapshot de convención documental
 
-- `api/` → rutas HTTP (FastAPI)  
-- `runtime/` → orquestación de ejecución  
-- `policies/` → control de ejecución  
-- `tools/` → tools ejecutables  
-- `schemas/` → modelos de datos  
-
----
-
-## Refactor reciente
-
-### Reestructuración de tools
-
-- `tools/local/` → ejecución local  
-- `tools/remote/` → reservado (no implementado aún)  
-- eliminado `tools/implementations/`  
-
-### Nuevas capas introducidas
-
-- `clients/` → capa de comunicación externa planificada (no activa)  
-- `audit/` → logging y trazabilidad planificados (no activo)  
-- `runtime/dispatcher.py` → presente pero no integrado en el flujo de ejecución  
-
----
-
-## Tools (actuales)
-
-### echo_tool
-- read_only: true  
-- comportamiento simple de eco  
-
-### system_info_tool
-- read_only: true  
-- devuelve metadatos del sistema  
-
-Ambas:
-- registradas en ToolRegistry  
-- invocables vía `/agent/run`  
-
----
-
-## Endpoints
-
-### GET /tools
-Devuelve la lista de tools registradas  
-
-### POST /agent/run
-Ejecuta el runtime del agente  
-
-Ejemplo:
-
-```json
-{
-  "user_input": "system info",
-  "dry_run": true
-}
+- `docs/` = fuente primaria de verdad
+- `docs_esp/` = traducción mantenida de `docs/`, pero no fuente primaria de verdad verificada
+- nueva auditoría de consistencia almacenada en `docs/audits/documentation_consistency_audit.md`

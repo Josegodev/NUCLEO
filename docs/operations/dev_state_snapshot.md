@@ -1,86 +1,52 @@
-# System Snapshot – NUCLEO
+# Development State Snapshot - NUCLEO
+
+## Snapshot Date
+
+2026-04-19
 
 ## Purpose
 
-This document captures the current operational state of the system
-at the moment of migration to a new Linux environment.
+Capture a concise point-in-time view of repository state after the introduction of the experimental lab path and the documentation normalization pass.
 
-It reflects real implementation status and recent structural changes.
+## Verified Current Runtime Shape
 
----
+- FastAPI backend
+- request-scoped API key authentication
+- `ExecutionContext` propagation
+- production runtime:
+  - planner
+  - policy
+  - registry
+  - tools
+- production tools:
+  - `echo`
+  - `system_info`
+- response carries:
+  - `status`
+  - `message`
+  - `result` optional
 
-## System Overview
+## Verified Experimental Additions
 
-The system is a modular agent runtime built with FastAPI.
+- `app/domain/tool_proposals/`
+- `app/domain/staging/`
+- `app/services/tool_proposal/`
+- `app/services/tool_generation/`
+- `app/services/staging/`
+- `app/services/audit/`
+- `runtime_lab/`
 
-Execution pipeline (current implementation):
+These additions are isolated from production registry activation.
 
-AgentRequest
-→ AgentService
-→ AgentRuntime
-→ Planner
-→ PolicyEngine
-→ ToolRegistry
-→ Tool
-→ AgentResponse
+## Current Gaps
 
----
+- planner contract still implicit
+- dry-run not yet enforced structurally
+- runtime error model still limited
+- lab artifact persistence behavior depends on environment write permissions and has not been fully validated in this repository session
 
-## Current Architecture
+## Documentation Convention Snapshot
 
-- `api/` → HTTP routes (FastAPI)
-- `runtime/` → execution orchestration
-- `policies/` → execution control
-- `tools/` → executable tools
-- `schemas/` → data models
-
----
-
-## Recent Refactor
-
-### Tools restructuring
-
-- `tools/local/` → local execution
-- `tools/remote/` → reserved (not implemented yet)
-- removed `tools/implementations/`
-
-### New layers introduced
-
-- `clients/` → planned external communication layer (not active)
-- `audit/` → planned logging and traceability (not active)
-- `runtime/dispatcher.py` → present but not integrated in execution flow
-
----
-
-## Tools (current)
-
-### echo_tool
-- read_only: true
-- simple echo behavior
-
-### system_info_tool
-- read_only: true
-- returns system metadata
-
-Both:
-- registered in ToolRegistry
-- callable via `/agent/run`
-
----
-
-## Endpoints
-
-### GET /tools
-Returns list of registered tools
-
-### POST /agent/run
-Executes agent runtime
-
-Example:
-
-```json
-{
-  "user_input": "system info",
-  "dry_run": true
-}
-
+- `docs/` = primary source of truth
+- `docs_esp/` = maintained translation of `docs/`, but not the primary source of verified truth
+- new consistency audit stored in `docs/audits/documentation_consistency_audit.md`

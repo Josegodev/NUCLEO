@@ -1,45 +1,53 @@
 # Planner
 
+## Layer
+
+Verified architecture
+
 ## Purpose
-Transform an `AgentRequest` into an executable plan for the runtime.
 
-## Real Behavior
-The current planner performs minimal normalization on `request.user_input` and applies simple keyword-based rules.
+Transform an `AgentRequest` into a runtime plan or, in the experimental opt-in path, emit a structured capability-gap signal.
 
-Behavior:
-1. Normalize input with `strip().lower()`
-2. If the text contains `system` or `info`, return:
-   - tool: `system_info`
-   - payload: `{}`
-3. Otherwise, return:
-   - tool: `echo`
-   - payload: `{"text": request.user_input}`
+## Verified Current Behavior
+
+The planner currently:
+
+1. normalizes `request.user_input` with `strip().lower()`
+2. if input contains `system` or `info`, returns a production plan for `system_info`
+3. if `experimental_tool_generation=True` and a simple heuristic suggests a missing capability, returns `capability_gap_detected`
+4. otherwise returns a production fallback plan for `echo`
+
+## Contract Observed in Code
+
+Current output remains an implicit `dict`.
+
+Observed keys:
+
+- `tool`
+- `payload`
+- `mode`
+
+Experimental gap path may add:
+
+- `original_input`
+- `capability_gap`
 
 ## Strengths
+
 - Deterministic
-- Easy to understand
-- Clear separation from runtime and tools
-- No side effects
+- Side-effect free in production path
+- Easy to read
+- Experimental branching is explicit and opt-in
 
-## Issues Detected
-- Plan output contract is implicit (`dict`)
-- Matching logic is too weak and substring-based
-- English-only keyword assumptions
-- Tight coupling to literal tool names
-- No explicit handling for empty input
-- No decision traceability
-- Payload/tool compatibility is implicit
-- Universal fallback to `echo` is assumed safe but not formalized
+## Current Limitations
 
-## Risk Level
-Medium
+- Output contract is not typed in production runtime
+- Matching logic is weak and heuristic-based
+- Capability-gap detection is intentionally simplistic
+- Strong coupling to literal production tool names remains
 
-## Recommended Improvements
-- Introduce typed execution plan schema
-- Add reasoning or trace metadata for rule matches
-- Formalize commands or intent rules
-- Clarify or extend language support
-- Handle empty input explicitly
-- Reduce string-based coupling with tool names
-- Prepare for rule-table or declarative routing growth
+## Status Label
 
+- Production planning: implemented
+- Capability-gap signaling: experimental
+- Real LLM-assisted planning: not implemented

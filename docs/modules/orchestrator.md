@@ -1,46 +1,56 @@
 # AgentRuntime
 
+## Layer
+
+Verified architecture
+
 ## Purpose
-Central execution orchestrator of the modular agent runtime.
 
-## Real Behavior
-The runtime receives an `AgentRequest`, asks the planner for a plan, evaluates policy, resolves the requested tool from the registry, executes it, and returns an `AgentResponse`.
+Central execution orchestrator of the production runtime, with a minimal isolated branch for experimental capability-gap handling.
 
-Current execution flow:
-1. `planner.create_plan(request)`
-2. Extract `plan["tool"]` and `plan["payload"]`
-3. `policy_engine.evaluate(tool_name, payload, dry_run)`
-4. If denied, return `blocked`
-5. Resolve tool from registry
-6. If missing, return `error`
-7. Execute `tool.run(payload)`
-8. Return `success` or `dry_run_success`
+## Verified Current Behavior
 
-## Strengths
-- Clear pipeline
-- Policy is enforced before execution
-- Unknown tool is handled explicitly
-- Readable orchestration logic
+`AgentRuntime.run(request, context)` currently:
 
-## Issues Detected
-- Planner output contract is implicit and not validated
-- No exception handling around planner, policy, or tool execution
-- `dry_run` is not structurally guaranteed by the runtime
-- Global singleton-style initialization at module import time
-- Runtime is coupled to concrete tools and bootstrap logic
-- Tool results are converted to `str`, losing structure
-- No payload validation per tool
-- Error responses are too generic
+1. asks the planner for a plan
+2. if the plan signals `capability_gap_detected`, routes into the isolated lab flow
+3. otherwise extracts production `tool` and `payload`
+4. asks `PolicyEngine` for authorization
+5. if denied, returns `blocked`
+6. resolves the tool from production `ToolRegistry`
+7. if missing, returns `error`
+8. executes `tool.run(payload, context=context)`
+9. returns `AgentResponse`
 
-## Risk Level
-High
+## Verified Experimental Branch
 
-## Recommended Improvements
-- Introduce explicit execution plan schema
-- Add controlled error handling per pipeline stage
-- Enforce `dry_run` structurally
-- Inject planner, policy engine, and registry
-- Move tool registration to bootstrap layer
-- Return structured tool output
-- Add payload validation contracts
-- Improve traceability and domain error modeling
+The runtime currently composes lab services at module import time and, for opt-in requests, can:
+
+- create a proposal
+- register it in staging
+- generate a tool skeleton
+- write audit events
+- return a controlled `capability_gap` response
+
+This does not register the tool in the production registry.
+
+## Current Strengths
+
+- Clear production pipeline
+- Explicit policy check before production tool execution
+- Explicit handling of missing production tool
+- Experimental branch remains isolated from production registry
+
+## Current Limitations
+
+- Planner contract still implicit
+- Runtime composition still happens at import time
+- Limited exception handling
+- `dry_run` still not structurally enforced for production tools
+- Response still duplicates data between `message` and `result`
+
+## Status Label
+
+- Production path: implemented
+- Lab gap-handling path: experimental
+- Full contract hardening: not implemented

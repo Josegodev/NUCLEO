@@ -1,101 +1,172 @@
-## Verified Current Behavior
+# Architecture - Verified Current State
 
-### Execution Flow (actual)
+## Purpose
 
-AgentRequest
-→ Planner (`create_plan`)
-→ PolicyEngine (`evaluate`)
-→ ToolRegistry (`get`)
-→ Tool (`run`)
+This document is the source of truth for architecture that can be verified directly in the current codebase. It describes implemented behavior, explicit experimental behavior, and known limitations when they are observable in code.
+
+## Documentation Convention
+
+This repository separates documentation into layers:
+
+- Verified architecture: implemented and code-verifiable behavior
+- Target architecture / vision: intended future design
+- Operations: run state, execution rules, and historical logs
+- Audits: critical evaluation, risks, gaps, and consistency checks
+- Session logs: chronological record of decisions and changes
+
+If a capability is experimental, partial, or future, it must be labeled explicitly.
+
+## Verified Execution Flow
+
+Stable runtime flow:
+
+AgentRequest  
+→ AgentService  
+→ AgentRuntime  
+→ Planner  
+→ PolicyEngine  
+→ ToolRegistry  
+→ Tool  
 → AgentResponse
 
-### Current Implementation Characteristics
+## Verified Endpoints
 
-- Planner returns a plain `dict` with keys:
-  - `tool`: str
-  - `payload`: dict  
-  This contract is implicit and not validated by the runtime.
+- `GET /` -> health response
+- `GET /tools` -> list registered production tools
+- `POST /agent/run` -> execute agent runtime
 
-- PolicyEngine applies a static whitelist based only on `tool_name`:
-  - allows: `echo`, `system_info`
-  - denies all others  
-  It does not evaluate `payload` or `dry_run`.
-
-- `dry_run` is passed through the system but:
-  - does not affect policy decisions
-  - does not prevent tool execution  
-  Tools are still executed normally by the runtime.
-
-- Tool resolution is performed via `ToolRegistry.get(tool_name)`:
-  - returns a tool instance or `None`
-  - missing tools are handled explicitly by the runtime
-
-- Tool results are returned via:
-  ```python
-  message = str(result)
-
-  # Authentication and ExecutionContext architecture
-
-## Objective
-Introduce authentication without coupling identity to the runtime process, and make execution identity available across the full pipeline.
-
-## Chosen design
-Request-scoped API key authentication with `ExecutionContext`.
-
-## Why this design
-The system must scale beyond local single-user execution.
-Authentication must belong to each request, not to the uvicorn process.
-
-## Architectural rule
-Authentication is handled at the API boundary.
-Authorization is handled by policy.
-Execution uses `ExecutionContext`.
-Tools do not validate credentials.
-
-## Layer responsibilities
+## Verified Component Responsibilities
 
 ### API
-- receive HTTP request
-- validate API key
-- build `ExecutionContext`
 
-### Service
-- propagate request + context
-- no auth logic
+- Receives HTTP requests
+- Resolves authentication at request boundary
+- Builds `ExecutionContext`
+- Delegates to `AgentService`
 
-### Runtime
-- orchestrate execution
-- pass context to policy and tools
+### AgentService
 
-### Policy
-- authorize by user / role / tool
+- Thin service facade over `AgentRuntime`
+- Propagates `AgentRequest` and `ExecutionContext`
+- Does not own planning, policy, or tool execution
 
-### Tool
-- execute using payload + context
-- no auth / no permission logic
+### AgentRuntime
 
-## Current auth mode
-- API key via FastAPI `HTTPBearer`
-- suitable for local/dev bootstrap and internal API use
+- Coordinates the runtime pipeline
+- Calls planner
+- Calls policy engine
+- Resolves tools through production registry
+- Executes production tools
+- Returns `AgentResponse`
 
-## Future migration path
-Authentication mechanism may later evolve to JWT.
-This should not require redesign of:
-- `AgentService`
-- `AgentRuntime`
-- `PolicyEngine`
-- `BaseTool`
+### Planner
 
-Only the auth boundary should change.
+- Performs simple rule-based planning
+- Returns an implicit `dict`
+- Can emit either:
+  - a production tool plan
+  - an experimental `capability_gap_detected` signal when explicitly requested
 
-## Stable internal contract
-`ExecutionContext` is now part of the execution pipeline and should remain the standard carrier for:
-- user identity
-- roles
-- auth method
-- request id
-- trace metadata
+### PolicyEngine
 
-## Next architecture step
-Refactor `AgentResponse` to structured output instead of stringified tool results.
+- Requires authenticated execution context
+- Allows `echo`
+- Allows `system_info` only for `admin`
+- Denies all other production tools by name
 
+### ToolRegistry
+
+- Stores production tool instances in a dictionary
+- Resolves tools by `tool.name`
+- Is separate from staging and experimental registries
+
+### Production Tools
+
+Currently registered at import time in the production runtime:
+
+- `echo`
+- `system_info`
+
+### AgentResponse
+
+Current runtime response model contains:
+
+- `status`
+- `message`
+- `result` optional
+
+`message` is still populated with `str(result)` for backward compatibility.
+
+## Verified Current Contracts
+
+### AgentRequest
+
+Current fields:
+
+- `user_input: str`
+- `dry_run: bool = True`
+- `experimental_tool_generation: bool = False`
+
+### Planner Output
+
+The planner still returns an implicit `dict`. The contract is not yet strongly typed in the stable runtime.
+
+Observed keys:
+
+- `tool`
+- `payload`
+- `mode`
+
+When experimental gap detection is triggered, additional keys may appear:
+
+- `original_input`
+- `capability_gap`
+
+### PolicyDecision
+
+Current fields:
+
+- `decision`
+- `reason`
+
+## Verified Experimental Subsystem
+
+An experimental subsystem for controlled tool proposal and skeleton generation is implemented in isolated modules and `runtime_lab/`.
+
+### Experimental flow
+
+This path is opt-in and does not change the production registry:
+
+AgentRequest with `experimental_tool_generation=True`  
+→ Planner may emit `capability_gap_detected`  
+→ AgentRuntime handles the gap  
+→ ToolProposalService creates a structured proposal  
+→ StagingRegistry stores isolated staging state  
+→ ToolGenerationService creates a lab-only skeleton  
+→ AuditStore records lab events  
+→ AgentResponse returns a controlled capability-gap result
+
+### Important architectural rule
+
+Experimental generated tools are not auto-registered in the production `ToolRegistry`.
+
+## Verified Constraints and Limitations
+
+- Planner output is still implicit and not runtime-validated
+- `dry_run` is still propagated but not structurally enforced for production tool execution
+- Policy is still largely name-based
+- Tool metadata such as `read_only` and `risk_level` are not yet enforced by policy
+- Production bootstrap still happens at module import time in `orchestrator.py`
+- Error handling in runtime is still limited
+
+## Explicitly Not Verified
+
+The following must not be described as implemented production behavior:
+
+- Real LLM-backed planning
+- Auto-extension of production registry
+- Dynamic package installation
+- Arbitrary shell execution
+- Autonomous promotion from staging to production
+
+Those behaviors are either not implemented or only documented as future direction elsewhere.

@@ -1,44 +1,41 @@
 # Files Audit
 
+## Layer
+
+Audit
+
 ## Purpose
 
-Track which parts of the repository have been audited.
+Track which technical files and modules are covered by documentation or repository audit.
 
-This document does not duplicate detailed audits.
-It only indicates coverage and references.
+## Covered Production Runtime Modules
 
----
+- `app/services/agent_service.py`
+- `app/runtime/orchestrator.py`
+- `app/runtime/planner.py`
+- `app/policies/engine.py`
+- `app/tools/base.py`
+- `app/tools/registry.py`
 
-## Audited Modules
+## Covered Experimental Lab Modules
 
-- `app/services/agent_service.py` → see `docs/modules/agent_service.md`
-- `app/runtime/orchestrator.py` → see `docs/modules/orchestrator.md`
-- `app/runtime/planner.py` → see `docs/modules/planner.md`
-- `app/policies/engine.py` → see `docs/modules/policy_engine.md`
-- `app/tools/base.py` → see `docs/modules/base_tool.md`
-- `app/tools/registry.py` → see `docs/modules/tool_registry.md`
-
----
+- `app/services/tool_proposal/tool_proposal_service.py`
+- `app/services/tool_generation/tool_generation_service.py`
+- `app/services/staging/staging_registry.py`
+- `app/services/audit/audit_store.py`
+- `app/domain/tool_proposals/models.py`
+- `app/domain/staging/models.py`
+- `app/schemas/tool_proposal.py`
 
 ## Structurally Reviewed
 
 - `app/main.py`
 - `app/api/routes/*`
-- `app/policies/models.py`
+- `app/api/deps/auth.py`
 - `app/schemas/*`
 - `app/runtime/dispatcher.py`
-
-(covered in `repo_audit.md`)
-
----
+- `runtime_lab/*`
 
 ## Summary
 
-The system is modular and correctly separated, but relies heavily on implicit contracts:
-
-- planner → runtime contract is not validated
-- tool input/output is not structured
-- policy does not enforce execution modes
-- runtime does not handle failures
-
-The architecture is sound, but still in a bootstrap stage.
+Repository coverage is sufficient to describe the stable execution path and the current isolated lab path. The main remaining documentation risk is historical drift across files rather than lack of module coverage.

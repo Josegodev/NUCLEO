@@ -1,115 +1,106 @@
-cat > ARCHITECTURE.md << 'EOF'
 # Architecture Vision
 
 ## Purpose
 
-This document describes the intended architecture of the system.
+This document describes the target architecture of NUCLEO. It is intentionally future-oriented and must not be read as a statement of verified current behavior.
 
-It represents the target design and may differ from the current implementation.
+For implemented behavior, see:
 
-For verified behavior, see:
-`docs/architecture.md`
+- `docs/architecture.md`
 
----
+## Target Direction
 
-## System Overview
+NUCLEO should evolve toward a modular agent runtime with:
 
-This project is a modular agent backend built with FastAPI.
-
-The goal is to:
-- receive a request
-- decide which tool to use
-- validate execution
-- execute the tool
-- return a structured response
-
----
+- explicit internal contracts
+- controlled execution semantics
+- typed execution planning
+- richer policy enforcement
+- auditable orchestration
+- isolated experimental surfaces for LLM-assisted capability growth
 
 ## Target Flow
 
-Request → API → AgentService → Runtime → Planner → PolicyEngine → ToolRegistry → Tool → Response
+Request  
+→ API  
+→ AgentService  
+→ Runtime  
+→ Planner  
+→ PolicyEngine  
+→ ToolRegistry  
+→ Tool  
+→ AgentResponse
 
----
+The target shape preserves the stable pipeline, but strengthens contract quality and operational control at each stage.
 
-## Components (Target Design)
+## Target Component Design
 
 ### API
-- FastAPI entrypoint
-- Handles HTTP transport
-- Delegates to AgentService
+
+- Transport boundary only
+- Authentication and request validation at edge
+- No business execution logic
 
 ### AgentService
-- Stable application layer
-- Entry point for execution
-- Decouples API from runtime
 
-### Runtime (Orchestrator)
-- Central coordinator of execution
-- Executes:
-  Planner → Policy → Tool → Response
+- Stable application entrypoint
+- Runtime facade
+- Future tracing and orchestration hooks
+
+### Runtime
+
+- Central orchestration layer
+- Explicit plan handling
+- Controlled failure semantics
+- Isolated branching between production runtime and experimental lab flows
 
 ### Planner
-- Maps user input to tool + payload
-- Target: structured and extensible planning logic
 
-### Policy Engine
-- Controls execution permissions
-- Target:
-  - payload-aware rules
-  - risk-based decisions
-  - dry_run enforcement
+- Evolve from ad hoc rules to more explicit planning structures
+- Support declarative rules first
+- Support optional LLM-assisted proposal logic later
+- Never become the final authority for execution
 
-### Tool Registry
-- Maintains tool catalog
-- Resolves tools by name
+### PolicyEngine
+
+- Move from name-based checks to metadata-aware and payload-aware control
+- Enforce meaningful `dry_run`
+- Preserve deny-by-default behavior
+
+### ToolRegistry
+
+- Keep production registry distinct from staging or lab registries
+- Strengthen registration contracts and metadata validation
 
 ### Tools
-- Encapsulated execution units
-- Target:
-  - structured input/output
-  - metadata-driven behavior
 
-### Schemas
-- Define input/output contracts
-- Target:
-  - strict validation
-  - typed execution structures
+- Typed input/output contracts
+- Clear metadata semantics
+- Safer execution boundaries
 
-### Core
-- Shared infrastructure
-- Target:
-  - logging
-  - configuration
-  - execution context
+### Experimental Lab
 
----
+- Remain isolated from production runtime
+- Support proposal generation, skeleton generation, staging review, and auditability
+- Never auto-promote to production without explicit review
 
-## Principles
+## Design Principles
 
-- Explicit control over execution
-- No implicit side effects
-- Separation of concerns
-- Strong contracts between components
-- Incremental evolution
+- explicit control over execution
+- no hidden authority shifts toward models or generated artifacts
+- separation of concerns
+- stable production path
+- isolated experimental path
+- traceability before autonomy
 
----
+## Known Gap Between Current State and Vision
 
-## Known Gaps vs Current Implementation
+Current code already contains a first experimental lab path, but the target architecture is still not complete. In particular, the following remain future or partial:
 
-- Contracts between components are still implicit
-- `dry_run` is not structurally enforced
-- Tool outputs are not structured
-- Runtime does not handle execution errors
-- Policy is based on simple tool-name allowlist
-
----
-
-## Target Capabilities
-
-- ExecutionContext (traceability and logging)
-- Structured tool input/output contracts
-- Payload-aware policy rules
-- Risk-based execution control
-- Multi-step planning
-- Optional LLM-assisted planning
-- Memory/state handling (later stage)
+- typed execution plan
+- strict runtime plan validation
+- full dry-run enforcement
+- payload-aware policy
+- complete traceability of production execution
+- real LLM-backed planning under controlled conditions
+- formal promotion workflow from staging to production

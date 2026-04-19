@@ -1,44 +1,42 @@
 # PolicyEngine
 
+## Layer
+
+Verified architecture
+
 ## Purpose
-Validate whether a planned tool execution is allowed before reaching the execution stage.
 
-## Real Behavior
-The current policy engine applies a static whitelist by tool name.
+Validate whether a planned production tool execution is allowed before reaching the execution stage.
 
-Behavior:
-- Allows `echo`
-- Allows `system_info`
-- Denies any other tool
-- Ignores `payload`
-- Ignores `dry_run`
+## Verified Current Behavior
 
-Returns a `PolicyDecision` with:
-- `decision`: `allow` or `deny`
-- `reason`: explanatory string
+`PolicyEngine.evaluate(...)` currently:
+
+- denies unauthenticated requests
+- allows `echo`
+- allows `system_info` only when `admin` is present in roles
+- denies any other tool name
+
+It returns a `PolicyDecision` with:
+
+- `decision`
+- `reason`
+
+## What It Does Not Currently Do
+
+- it does not deeply evaluate payload
+- it does not enforce meaningful `dry_run`
+- it does not use `read_only` or `risk_level`
+- it does not govern lab artifact generation directly
 
 ## Strengths
-- Real deny-by-default behavior
-- Simple and auditable
-- Clear separation from execution
-- Structured output via `PolicyDecision`
 
-## Issues Detected
-- `payload` is not evaluated
-- `dry_run` has no effect on policy decisions
-- Security is based only on tool name, not capability or metadata
-- Hardcoded tool names create duplication with planner/registry
-- No structured policy rule identifiers
-- Not ready for contextual or parameter-sensitive control
+- deny-by-default shape
+- clear separation from execution
+- authenticated context is part of decision path
 
-## Risk Level
-Medium
+## Status Label
 
-## Recommended Improvements
-- Document explicitly that this is currently a tool-name allowlist
-- Start using tool metadata such as `read_only` and `risk_level`
-- Enforce meaningful `dry_run` restrictions
-- Prepare payload-aware validation
-- Move toward declarative rule definitions
-- Enrich `PolicyDecision` with rule metadata
-
+- Production authorization: implemented
+- Metadata-aware policy: not implemented
+- Lab promotion control: not implemented

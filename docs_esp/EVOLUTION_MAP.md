@@ -1,189 +1,118 @@
+> Archivo origen: `docs/EVOLUTION_MAP.md`
+> Última sincronización: `2026-04-19`
+
 # Mapa de evolución
 
 ## Propósito
 
-Este documento describe la transición desde el estado actual auditado del sistema
-hacia un runtime de agentes modulares más robusto y escalable.
+Este documento traza la transición desde el estado actualmente verificado del sistema hacia un runtime más robusto, distinguiendo con claridad entre capacidades implementadas, parciales, experimentales y futuras.
 
-Está basado en el comportamiento real del código verificado, no solo en la arquitectura teórica.
+## Estado actual verificado
 
----
+El repositorio ofrece actualmente:
 
-## Estado actual (auditado)
+- entrypoint FastAPI para ejecución del runtime
+- `AgentService` como fachada sobre `AgentRuntime`
+- `AgentRuntime` como orquestador de producción
+- `Planner` basado en reglas
+- `PolicyEngine` name-based con comprobación de rol para `system_info`
+- `ToolRegistry` para resolución de tools de producción
+- tools de producción:
+  - `echo`
+  - `system_info`
+- `ExecutionContext` propagado a través de API, runtime, policy y tools
+- `AgentResponse` con `status`, `message` y `result` opcional
 
-El sistema actualmente proporciona:
+## Estado experimental actual
 
-- Punto de entrada FastAPI para ejecución del agente  
-- AgentService como fachada ligera sobre el runtime  
-- AgentRuntime como orquestador central de ejecución  
-- Planner basado en reglas  
-- PolicyEngine basado en whitelist estática  
-- ToolRegistry para resolución de tools  
-- BaseTool como interfaz común débil  
-- Tools iniciales: `echo`, `system_info`  
+El repositorio también contiene un subsistema experimental de laboratorio aislado:
 
-### Características actuales
+- señal de capability gap desde el planner cuando se solicita explícitamente
+- placeholder determinista para generación de proposals
+- staging registry aislado
+- generación de skeletons solo de laboratorio
+- generación de artefactos de audit
 
-- el flujo de ejecución es claro y modular  
-- los contratos entre componentes son mayoritariamente implícitos  
-- el planner devuelve un dict plano (`tool`, `payload`)  
-- la policy evalúa únicamente el nombre de la tool  
-- `dry_run` existe pero no está estructuralmente aplicado  
-- las salidas de las tools se convierten a string en `AgentResponse.message`  
-- el runtime no captura excepciones de planner / policy / tool  
-- el registro de tools ocurre en tiempo de importación de módulos  
+Este subsistema está implementado, pero no forma parte de la ruta estable del registry de producción.
 
----
-
-## Principales debilidades
+## Principales debilidades pendientes
 
 ### 1. Contratos internos débiles
-- la salida del planner no está tipada ni validada  
-- los contratos de payload de las tools son implícitos  
-- el formato de salida de las tools no está estandarizado  
 
-### 2. Seguridad de ejecución incompleta
-- `dry_run` no está garantizado por diseño  
-- la policy no evalúa payload ni metadatos de la tool  
-- `read_only` y `risk_level` están definidos pero no aplicados  
+- la salida del planner sigue siendo implícita
+- los contratos de payload de las tools siguen siendo implícitos
+- la salida de las tools aún no está estandarizada más allá del contenedor actual de respuesta
 
-### 3. Robustez limitada ante errores
-- no hay manejo estructurado de excepciones en el runtime  
-- los fallos pueden propagarse fuera del modelo de respuesta del dominio  
+### 2. Control de ejecución incompleto
 
-### 4. Acoplamiento en fase bootstrap
-- planner, registry y policy engine se crean de forma global  
-- el runtime está acoplado a decisiones concretas de inicialización  
+- `dry_run` sigue sin imponerse de forma estructural en producción
+- la policy no evalúa el payload en profundidad
+- los metadatos `read_only` y `risk_level` aún no se aplican desde policy
 
-### 5. Escalabilidad limitada en la lógica de decisión
-- el planner se basa en matching simple por substrings  
-- la policy se basa en una allowlist hardcodeada por nombre de tool  
+### 3. Gaps de robustez del runtime
 
----
+- manejo limitado de excepciones estructuradas en runtime
+- no existe una taxonomía formal de errores de dominio
+
+### 4. Acoplamiento de bootstrap
+
+- planner, policy engine, registry y servicios experimentales siguen componiéndose en tiempo de importación del módulo
+
+### 5. Riesgo de deriva documental y operativa
+
+- los documentos históricos contienen snapshots anteriores y deben leerse como logs, no como verdad actual
+- `docs_esp/` es ahora una traducción mantenida de `docs/`, pero `docs/` sigue siendo la fuente primaria verificada
 
 ## Prioridades de evolución
 
-## Prioridad 1 — Reforzar contratos
+### Prioridad 1 - Reforzar contratos
 
-Objetivo:  
-Hacer las interfaces explícitas y verificables por máquina.
+- introducir un execution plan tipado
+- definir contratos estructurados de payload para tools
+- definir contratos más sólidos para resultados de tools
+- reforzar el contrato de `BaseTool`
 
-Acciones:
-- introducir un `ExecutionPlan` tipado  
-- definir esquemas estructurados de entrada de tools  
-- definir un modelo estructurado de salida/resultados de tools  
-- reforzar `BaseTool` como contrato abstracto real  
+### Prioridad 2 - Imponer control de ejecución
 
-Impacto esperado:
-- menos supuestos implícitos  
-- refactors más seguros  
-- mayor facilidad de testing y extensión  
+- hacer que `dry_run` tenga efecto real
+- usar metadatos de tools en decisiones de policy
+- preparar comprobaciones de policy sensibles al payload
 
----
+### Prioridad 3 - Mejorar la robustez del runtime
 
-## Prioridad 2 — Aplicar control de ejecución
+- añadir manejo controlado de errores por etapa del pipeline
+- estandarizar respuestas de error de dominio
+- mejorar la trazabilidad
 
-Objetivo:  
-Convertir las garantías de seguridad en algo real, especialmente en los modos de ejecución.
+### Prioridad 4 - Desacoplar composición y orquestación
 
-Acciones:
-- aplicar correctamente `dry_run`  
-- usar `read_only` y `risk_level` en decisiones de policy  
-- preparar validaciones de policy sensibles al payload  
+- inyectar planner, registry y policy en el runtime
+- mover la composición de producción y del laboratorio a una capa de bootstrap dedicada
 
-Impacto esperado:
-- mayores garantías de ejecución  
-- base segura para tools no read-only en el futuro  
+### Prioridad 5 - Madurar el laboratorio experimental
 
----
+- workflow real de review para el staging registry
+- metadatos más ricos en artefactos
+- proceso explícito de promoción
+- integración real con LLM solo detrás de límites controlados
 
-## Prioridad 3 — Mejorar robustez del runtime
+## Aún no recomendado
 
-Objetivo:  
-Hacer que la capa de orquestación sea resiliente a fallos.
+Lo siguiente no debe tratarse todavía como prioridad de producción antes de reforzar contratos y control de ejecución:
 
-Acciones:
-- añadir manejo controlado de excepciones por etapa del pipeline  
-- estandarizar respuestas de error  
-- mejorar la trazabilidad de fallos y decisiones  
+- activación autónoma de tools
+- autoextensión de producción
+- autoridad no controlada del planner soportado por LLM
+- ejecución distribuida
+- orquestación implícita de memoria/estado
 
-Impacto esperado:
-- comportamiento predecible ante errores  
-- depuración y auditoría más sencillas  
+## Resultado objetivo
 
----
+Un runtime con:
 
-## Prioridad 4 — Desacoplar composición de orquestación
-
-Objetivo:  
-Separar la configuración del sistema de su ejecución.
-
-Acciones:
-- inyectar planner, registry y policy engine en el runtime  
-- mover el registro de tools fuera del módulo del orquestador  
-- preparar una capa de bootstrap/composición  
-
-Impacto esperado:
-- mejor testabilidad  
-- arquitectura más limpia  
-- configuración más sencilla por entorno  
-
----
-
-## Prioridad 5 — Evolucionar capas de decisión y policy
-
-Objetivo:  
-Preparar el sistema para crecer sin perder control.
-
-Acciones:
-- evolucionar el planner de checks ad hoc a reglas declarativas  
-- evolucionar la policy de allowlist por nombre a reglas basadas en metadatos/capacidades  
-- añadir metadatos mínimos de trazabilidad de ejecución  
-
-Impacto esperado:
-- mayor escalabilidad  
-- mejor observabilidad  
-- transición más fluida hacia planificación multi-step o asistida por LLM  
-
----
-
-## Orden sugerido de evolución
-
-1. Contratos  
-2. Aplicación de dry-run y policy  
-3. Manejo de errores en runtime  
-4. Inyección de dependencias / limpieza de bootstrap  
-5. Evolución de planner y policy  
-6. Capacidades avanzadas:
-   - contexto de ejecución  
-   - trazabilidad  
-   - planificación multi-step  
-   - integración con LLM  
-   - memoria/estado  
-
----
-
-## No recomendado aún
-
-Lo siguiente no debería priorizarse antes de reforzar contratos y control:
-
-- orquestación multi-step  
-- gestión de memoria/estado  
-- reemplazo del planner por LLM  
-- composición autónoma de tools  
-
-Motivo:  
-El sistema actual es modular y comprensible, pero aún depende de supuestos implícitos frágiles.
-
----
-
-## Dirección objetivo
-
-Un runtime modular robusto con:
-
-- contratos explícitos  
-- ejecución controlada  
-- estructuras tipadas de planificación y salida  
-- ejecución de tools consciente de policy  
-- límites de dependencias limpios  
-- orquestación trazable y testeable  
+- contratos explícitos
+- ejecución controlada
+- registry de producción estable
+- laboratorio experimental aislado
+- orquestación trazable
+- documentación que separe con claridad el estado actual de la visión futura

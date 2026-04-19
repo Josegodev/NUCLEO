@@ -1,44 +1,56 @@
+> Archivo origen: `docs/modules/planner.md`
+> Última sincronización: `2026-04-19`
+
 # Planner
 
+## Capa
+
+Arquitectura verificada
+
 ## Propósito
-Transformar un `AgentRequest` en un plan ejecutable para el runtime.
 
-## Comportamiento real
-El planner actual realiza una normalización mínima sobre `request.user_input` y aplica reglas simples basadas en palabras clave.
+Transformar un `AgentRequest` en un plan de runtime o, en la ruta experimental opt-in, emitir una señal estructurada de capability gap.
 
-Comportamiento:
-1. Normaliza el input con `strip().lower()`  
-2. Si el texto contiene `system` o `info`, devuelve:  
-   - tool: `system_info`  
-   - payload: `{}`  
-3. En caso contrario, devuelve:  
-   - tool: `echo`  
-   - payload: `{"text": request.user_input}`  
+## Comportamiento actual verificado
+
+El planner actualmente:
+
+1. normaliza `request.user_input` con `strip().lower()`
+2. si la entrada contiene `system` o `info`, devuelve un plan de producción para `system_info`
+3. si `experimental_tool_generation=True` y una heurística simple sugiere que falta una capacidad, devuelve `capability_gap_detected`
+4. en cualquier otro caso devuelve un plan fallback de producción para `echo`
+
+## Contrato observado en código
+
+La salida actual sigue siendo un `dict` implícito.
+
+Claves observadas:
+
+- `tool`
+- `payload`
+- `mode`
+
+La ruta experimental de gap puede añadir:
+
+- `original_input`
+- `capability_gap`
 
 ## Fortalezas
-- Determinista  
-- Fácil de entender  
-- Separación clara respecto a runtime y tools  
-- Sin efectos secundarios  
 
-## Problemas detectados
-- El contrato de salida del plan es implícito (`dict`)  
-- La lógica de matching es débil y basada en substrings  
-- Supone palabras clave solo en inglés  
-- Acoplamiento fuerte a nombres literales de tools  
-- No hay manejo explícito de input vacío  
-- No hay trazabilidad de decisiones  
-- La compatibilidad payload/tool es implícita  
-- El fallback universal a `echo` se asume seguro pero no está formalizado  
+- determinista
+- sin efectos laterales en la ruta de producción
+- fácil de leer
+- la ramificación experimental es explícita y opt-in
 
-## Nivel de riesgo
-Medio
+## Limitaciones actuales
 
-## Mejoras recomendadas
-- Introducir un esquema tipado de plan de ejecución  
-- Añadir metadatos de razonamiento o trazabilidad de reglas aplicadas  
-- Formalizar comandos o reglas de intención  
-- Aclarar o ampliar soporte de idiomas  
-- Manejar explícitamente inputs vacíos  
-- Reducir el acoplamiento basado en strings con nombres de tools  
-- Preparar evolución hacia tablas de reglas o routing declarativo  
+- el contrato de salida no está tipado en el runtime de producción
+- la lógica de matching es débil y basada en heurísticas
+- la detección de capability gap es intencionadamente simple
+- persiste un acoplamiento fuerte a nombres literales de tools de producción
+
+## Etiqueta de estado
+
+- Planificación de producción: implementada
+- Señalización de capability gap: experimental
+- Planificación real asistida por LLM: no implementada

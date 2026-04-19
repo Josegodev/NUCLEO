@@ -1,40 +1,33 @@
 # BaseTool
 
+## Layer
+
+Verified architecture
+
 ## Purpose
-Define the common interface and metadata required for all tools in the system.
 
-## Real Behavior
-`BaseTool` defines attributes and a `run(payload)` method that must be implemented by concrete tools.
+Define the common conceptual interface for production tools.
 
-However:
-- It is not an abstract class
-- Metadata is not validated
-- There is no enforced contract for inputs or outputs
+## Verified Current Behavior
 
-## Strengths
-- Provides a common conceptual structure
-- Separates tools from runtime
-- Simple and easy to extend
+`BaseTool` currently declares:
 
-## Issues Detected
-- Not a true interface (can be instantiated directly)
-- Metadata fields are not enforced or validated
-- `risk_level` is an untyped string
-- `read_only` is not enforced anywhere
-- Output contract of `run()` is unclear
-- No payload schema or validation
-- No support for `dry_run`
-- Tool identity relies only on a string name
+- `name`
+- `description`
+- `read_only`
+- `risk_level`
+- `run(payload, context=None)`
 
-## Risk Level
-Medium-High
+Concrete tools are expected to implement `run(...)`.
 
-## Recommended Improvements
-- Convert into an abstract base class
-- Validate metadata at initialization
-- Introduce a typed `RiskLevel`
-- Standardize tool output format
-- Define payload schemas per tool
-- Add support for `dry_run` or execution context
-- Prepare separation between metadata and execution logic
+## Important Current Reality
 
+- `BaseTool` is not a strict abstract base class
+- metadata is not validated at construction time
+- metadata is not yet enforced by policy
+- input/output contracts remain implicit
+
+## Status Label
+
+- Common tool contract concept: implemented
+- Strong typed contract enforcement: not implemented

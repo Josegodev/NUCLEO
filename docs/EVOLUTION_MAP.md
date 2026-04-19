@@ -2,189 +2,114 @@
 
 ## Purpose
 
-This document maps the transition from the current audited system state
-to a more robust and scalable modular agent runtime.
+This document maps the transition from the currently verified system state to a more robust runtime, while distinguishing clearly between implemented, partial, experimental, and future capabilities.
 
-It is based on verified code behavior, not intended architecture alone.
+## Current Verified State
 
----
+The repository currently provides:
 
-## Current State (audited)
+- FastAPI entrypoint for runtime execution
+- `AgentService` as facade over `AgentRuntime`
+- `AgentRuntime` as production orchestrator
+- Rule-based `Planner`
+- Name-based `PolicyEngine` with role check for `system_info`
+- `ToolRegistry` for production tool lookup
+- Production tools:
+  - `echo`
+  - `system_info`
+- `ExecutionContext` propagated across API, runtime, policy, and tools
+- `AgentResponse` with `status`, `message`, and optional `result`
 
-The system currently provides:
+## Current Experimental State
 
-- FastAPI entrypoint for agent execution
-- AgentService as thin façade over runtime
-- AgentRuntime as central execution orchestrator
-- Rule-based Planner
-- Static whitelist-based PolicyEngine
-- ToolRegistry for tool lookup
-- BaseTool as weak common interface
-- Initial tools: `echo`, `system_info`
+The repository also contains an isolated experimental lab subsystem:
 
-### Current characteristics
+- capability-gap signal from planner when explicitly requested
+- deterministic proposal generation placeholder
+- isolated staging registry
+- lab-only skeleton generation
+- audit artifact generation
 
-- execution flow is clear and modular
-- contracts between components are mostly implicit
-- planner returns a plain dict (`tool`, `payload`)
-- policy evaluates only tool name
-- `dry_run` exists but is not structurally enforced
-- tool outputs are stringified into `AgentResponse.message`
-- runtime does not catch planner / policy / tool exceptions
-- tool registration happens at module import time
+This subsystem is implemented but not part of the stable production registry path.
 
----
-
-## Main Weaknesses
+## Main Remaining Weaknesses
 
 ### 1. Weak internal contracts
-- planner output is not typed or validated
-- tool payload contracts are implicit
-- tool output format is not standardized
 
-### 2. Incomplete execution safety
-- `dry_run` is not guaranteed by design
-- policy does not evaluate payload or tool metadata
-- `read_only` and `risk_level` are declared but not enforced
+- planner output is still implicit
+- tool payload contracts are still implicit
+- tool output is not yet standardized beyond current response container
 
-### 3. Limited error robustness
-- no structured exception handling in runtime
-- failures can propagate outside the domain response model
+### 2. Incomplete execution control
 
-### 4. Tight bootstrap coupling
-- planner, registry and policy engine are created globally
-- runtime is coupled to concrete initialization choices
+- `dry_run` is still not structurally enforced for production execution
+- policy does not evaluate payload deeply
+- `read_only` and `risk_level` metadata are still not policy-enforced
 
-### 5. Limited scalability of decision logic
-- planner is based on simple substring matching
-- policy is based on hardcoded tool-name allowlist
+### 3. Runtime robustness gaps
 
----
+- limited structured exception handling in runtime
+- no formal domain error taxonomy
+
+### 4. Bootstrap coupling
+
+- planner, policy engine, registry, and experimental services are still composed at module import time
+
+### 5. Documentation and operational drift risk
+
+- historical documents contain earlier snapshots that must be read as logs, not current truth
+- `docs_esp/` is a maintained translation of `docs/`, but not the primary verified source
 
 ## Evolution Priorities
 
-## Priority 1 — Reinforce contracts
+### Priority 1 - Reinforce contracts
 
-Objective:
-Make interfaces explicit and machine-checkable.
+- introduce typed execution plan
+- define structured tool payload contracts
+- define stronger tool result contracts
+- strengthen `BaseTool` contract
 
-Actions:
-- introduce typed `ExecutionPlan`
-- define structured tool input schemas
-- define structured tool output/result model
-- strengthen `BaseTool` as real abstract contract
+### Priority 2 - Enforce execution control
 
-Expected impact:
-- fewer hidden assumptions
-- safer refactors
-- easier testing and extension
-
----
-
-## Priority 2 — Enforce execution control
-
-Objective:
-Make safety guarantees real, especially around execution modes.
-
-Actions:
-- enforce meaningful `dry_run`
-- use `read_only` and `risk_level` in policy decisions
+- make `dry_run` meaningful
+- use tool metadata in policy decisions
 - prepare payload-aware policy checks
 
-Expected impact:
-- stronger execution guarantees
-- safer future non-read-only tools
+### Priority 3 - Improve runtime robustness
 
----
+- add controlled error handling by pipeline stage
+- standardize domain error responses
+- improve traceability
 
-## Priority 3 — Improve runtime robustness
+### Priority 4 - Decouple composition from orchestration
 
-Objective:
-Make the orchestration layer resilient to failure.
+- inject planner, registry, and policy into runtime
+- move production and lab composition into dedicated bootstrap layer
 
-Actions:
-- add controlled exception handling per pipeline stage
-- standardize error responses
-- improve traceability of failures and decisions
+### Priority 5 - Mature experimental lab
 
-Expected impact:
-- predictable behavior under failure
-- easier debugging and auditability
-
----
-
-## Priority 4 — Decouple composition from orchestration
-
-Objective:
-Separate system wiring from system execution.
-
-Actions:
-- inject planner, registry and policy engine into runtime
-- move tool registration out of orchestrator module
-- prepare bootstrap/composition layer
-
-Expected impact:
-- better testability
-- cleaner architecture
-- easier environment-specific configuration
-
----
-
-## Priority 5 — Evolve decision and policy layers
-
-Objective:
-Prepare the system for growth without losing control.
-
-Actions:
-- evolve planner from ad hoc keyword checks to declarative rules
-- evolve policy from name allowlist to metadata/capability-based rules
-- add minimal execution trace metadata
-
-Expected impact:
-- better scalability
-- improved observability
-- smoother path toward multi-step or LLM-assisted planning
-
----
-
-## Suggested Evolution Order
-
-1. Contracts
-2. Dry-run and policy enforcement
-3. Runtime error handling
-4. Dependency injection / bootstrap cleanup
-5. Planner and policy evolution
-6. Advanced capabilities:
-   - execution context
-   - traceability
-   - multi-step planning
-   - LLM integration
-   - memory/state
-
----
+- real review workflow for staging registry
+- richer artifact metadata
+- explicit promotion process
+- real LLM integration only behind controlled boundaries
 
 ## Not Yet Recommended
 
-The following should not be prioritized before contracts and control are reinforced:
+The following should still not be treated as production priorities before contracts and execution control are stronger:
 
-- multi-step orchestration
-- memory/state handling
-- LLM-based planner replacement
-- autonomous tool composition
+- autonomous tool activation
+- production self-extension
+- uncontrolled LLM planner authority
+- distributed execution
+- implicit memory/state orchestration
 
-Reason:
-the current system is modular and understandable, but still relies on fragile implicit assumptions.
+## Target Outcome
 
----
-
-## Target Direction
-
-A robust modular runtime with:
+A runtime with:
 
 - explicit contracts
 - controlled execution
-- typed planning/output structures
-- policy-aware tool execution
-- clean dependency boundaries
-- traceable and testable orchestration
-
+- stable production registry
+- isolated experimental lab
+- traceable orchestration
+- documentation that clearly separates current state from future vision

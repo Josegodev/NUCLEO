@@ -1,185 +1,93 @@
-# Development Plan – NUCLEO
+> Archivo origen: `docs/planning/development_plan.md`
+> Última sincronización: `2026-04-19`
 
-## Purpose
+# Plan de desarrollo - NUCLEO
 
-Define the next technical steps after completing the full system audit.
+## Propósito
 
-The system is now understood.  
-The next phase is to reinforce contracts, control, and robustness before adding new features.
+Definir los siguientes pasos técnicos desde el estado verificado actual del repositorio sin presentar objetivos futuros como comportamiento implementado.
 
----
+## Base actual
 
-## Current Status
+Verificado hoy:
 
-Audit completed for:
+- ruta estable del runtime de producción
+- autenticación por API key con alcance de request y `ExecutionContext`
+- `result` estructurado preservado en la respuesta
+- laboratorio experimental aislado para proposal de tools y generación de skeletons
 
-- AgentService
-- AgentRuntime (orchestrator)
-- Planner
-- PolicyEngine
-- ToolRegistry
-- BaseTool
+## Prioridades actuales
 
-Documentation created:
+### Prioridad 1 - Refuerzo de contratos
 
-- architecture.md (verified behavior)
-- evolution_map.md
-- modules audit
-- repo audit
+Objetivo:
+Reducir contratos implícitos en el runtime de producción.
 
----
+Acciones:
 
-## Phase 1 — Contract Reinforcement (HIGH PRIORITY)
+- introducir un execution plan tipado
+- definir contratos más sólidos de payload para tools
+- definir un contrato más sólido para resultados de tools
+- reforzar `BaseTool`
 
-Objective:
-Eliminate implicit contracts and make system behavior explicit.
+### Prioridad 2 - Control de ejecución
 
-Actions:
+Objetivo:
+Hacer que la semántica de ejecución sea más segura y explícita.
 
-- Introduce `ExecutionPlan` (replace dict in planner)
-- Define structured tool output (avoid `str(result)`)
-- Define payload schemas per tool
-- Strengthen BaseTool as abstract interface
+Acciones:
 
----
+- imponer un `dry_run` con significado real
+- usar `read_only` y `risk_level` en decisiones de policy
+- preparar restricciones sensibles al payload
 
-## Phase 2 — Execution Control (HIGH PRIORITY)
+### Prioridad 3 - Robustez del runtime
 
-Objective:
-Ensure safe and predictable execution.
+Objetivo:
+Hacer que el runtime de producción sea resistente ante fallos.
 
-Actions:
+Acciones:
 
-- Enforce `dry_run` at runtime or policy level
-- Use `read_only` and `risk_level` in policy decisions
-- Prevent execution of unsafe tools in dry_run
+- añadir manejo controlado de excepciones por etapa del pipeline
+- estandarizar respuestas de error
+- mejorar la trazabilidad a nivel de dominio
 
----
+### Prioridad 4 - Limpieza de composición
 
-## Phase 3 — Error Handling (HIGH PRIORITY)
+Objetivo:
+Separar bootstrap de orquestación.
 
-Objective:
-Guarantee controlled system behavior under failure.
+Acciones:
 
-Actions:
+- inyectar planner, policy engine y registry en el runtime
+- mover la lógica de composición fuera del módulo `orchestrator`
+- preparar una capa de bootstrap dedicada
 
-- Add try/catch per pipeline stage:
-  - planner
-  - policy
-  - tool execution
-- Standardize error responses
-- Ensure runtime always returns AgentResponse
+### Prioridad 5 - Maduración del Experimental Lab
 
----
+Objetivo:
+Hacer que la ruta de laboratorio sea revisable y operativamente más clara sin promocionarla a producción.
 
-## Phase 4 — Dependency Decoupling (MEDIUM PRIORITY)
+Acciones:
 
-Objective:
-Remove hidden coupling and improve testability.
+- mejorar la calidad del schema de proposals
+- mejorar el workflow de review en staging
+- mejorar los metadatos de los artefactos generados
+- añadir un diseño explícito de aprobación/promoción sin activación automática
 
-Actions:
+## Explícitamente futuro, no actual
 
-- Inject planner, policy engine, and registry into runtime
-- Move tool registration out of orchestrator module
-- Prepare bootstrap/composition layer
+Lo siguiente no son capacidades actuales de producción:
 
----
+- planificación real soportada por LLM
+- activación autónoma de tools
+- autoextensión de producción
+- instalación dinámica de paquetes
+- ejecución arbitraria de shell
+- orquestación de memoria/estado en producción
 
-## Phase 5 — Minimal Observability (MEDIUM PRIORITY)
+## Principio rector
 
-Objective:
-Make system behavior traceable.
+Estabilizar antes de expandir.
 
-Actions:
-
-- Log:
-  - selected tool
-  - policy decision
-  - execution result
-- Prepare ExecutionContext (later)
-
----
-
-## Phase 6 — Persistencia (BASE DE DATOS) (MEDIUM PRIORITY)
-
-Objective:
-Introducir persistencia para almacenar estado, ejecuciones y trazabilidad del sistema.
-
-Contexto:
-Actualmente el sistema es completamente stateless.  
-No existe almacenamiento de ejecuciones, resultados ni contexto.
-
-Alcance inicial (mínimo, sin sobreingeniería):
-
-- Registrar ejecuciones del runtime:
-  - request_id
-  - user_input
-  - tool seleccionada
-  - decisión de policy
-  - resultado
-  - timestamp
-
-- Persistir logs estructurados (alternativa o complemento a logging plano)
-
-Decisiones técnicas a definir:
-
-- Tipo de base de datos:
-  - SQLite (local, simple, recomendado inicio)
-  - PostgreSQL (si se escala a multi-entorno)
-
-- Modelo de datos mínimo:
-  - ExecutionRecord
-  - (opcional) ToolExecution
-  - (opcional) PolicyDecisionLog
-
-- Estrategia de integración:
-  - NO acoplar directamente al runtime core
-  - introducir capa futura (`storage/` o `persistence/`)
-  - usar interfaz simple (repository pattern ligero)
-
-Restricciones:
-
-- No introducir ORM complejo en esta fase
-- No romper simplicidad del runtime
-- Persistencia debe ser opcional (feature toggle posible)
-
-Impacto esperado:
-
-- Trazabilidad real de ejecuciones
-- Base para debugging avanzado
-- Preparación para auditoría y análisis
-- Base futura para memoria/estado (sin implementarlo aún)
-
----
-
-## Phase 7 — Planner & Policy Evolution (LOW PRIORITY)
-
-Only after previous phases are complete.
-
-Actions:
-
-- Improve planner logic (rules → structured matching)
-- Move policy from tool-name allowlist to metadata-based rules
-
----
-
-## Not Allowed Yet
-
-Do NOT introduce:
-
-- LLM-based planner
-- multi-step execution
-- memory/state
-- distributed execution
-
-Reason:
-The system still relies on fragile implicit contracts.
-
----
-
-## Guiding Principle
-
-Stabilize before expanding.
-
-The current system is modular and correct in structure,  
-but must become robust before increasing complexity.
+El runtime de producción debe volverse más explícito y controlado antes de que las capacidades experimentales se hagan más ambiciosas.

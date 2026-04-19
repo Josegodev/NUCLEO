@@ -1,167 +1,117 @@
-# Session Log
+> Archivo origen: `docs/operations/session_log.md`
+> Última sincronización: `2026-04-19`
 
----
+# Session log
 
 ## 2026-04-10
 
-- Implementado el orquestador de runtime  
-- Añadidas las tools echo y system_info  
-- Introducida la capa de policy  
-- Intento de integración de execution context  
-- Revertido por excesiva complejidad de refactor  
-
-### Rollback
-
-- Reversión al último commit estable  
-- Identificada la necesidad de cambios incrementales controlados  
-- Introducidos archivos de seguimiento de estado del proyecto  
-
----
+- Se implementó la orquestación del runtime.
+- Se añadieron las tools `echo` y `system_info`.
+- Se introdujo una primera capa de policy.
+- Se intentó integrar execution context.
+- Se revirtió el primer intento de context por exceso de alcance en el refactor.
 
 ## 2026-04-11
 
-- Auditoría arquitectónica de:
-  - main.py  
-  - api/routes/agent.py  
-  - runtime/orchestrator.py  
-
-- Estructura del sistema clarificada:  
-  API → AgentService → Runtime → Planner → Policy → Registry → Tool → Response  
-
-- Roles arquitectónicos identificados:
-  - API = punto de entrada  
-  - AgentService = fachada  
-  - Runtime = orquestador  
-  - Planner = capa de decisión  
-  - Policy = capa de control  
-  - Tools = capa de ejecución  
-
-- Limitaciones identificadas:
-  - sin trazabilidad de ejecución  
-  - dependencias globales en runtime  
-  - planner simple  
-  - policy engine básico  
-  - respuesta no estructurada  
-
-- Auditoría pausada por limitaciones de hardware  
-
----
+- Se auditó:
+  - `main.py`
+  - `api/routes/agent.py`
+  - `runtime/orchestrator.py`
+- Se aclaró la estructura del runtime:
+  - API -> AgentService -> Runtime -> Planner -> Policy -> Registry -> Tool -> Response
+- Se identificaron limitaciones:
+  - sin execution tracing
+  - dependencias globales en runtime
+  - planner simple
+  - policy engine básico
+  - respuesta no estructurada
 
 ## 2026-04-12
 
-- Continuación de auditoría completa del sistema:
-  - planner.py  
-  - policies/engine.py  
-  - tools/registry.py  
-  - tools/base.py  
-  - implementaciones de tools  
-
-- Flujo de ejecución verificado:  
-  Planner → Policy → Registry → Tool.run()  
-
-- Añadidos docstrings mínimos en módulos principales  
-
-- Problemas estructurales corregidos:
-  - eliminado agent.py en raíz no utilizado  
-
-- Problemas de calidad de código identificados:
-  - docstrings faltantes  
-  - inconsistencias de formato  
-
-### Refactor de Tools
-
-- Movidas tools a `tools/local/`  
-- Preparado `tools/remote/`  
-- Añadido:
-  - `clients/`  
-  - `audit/`  
-  - `runtime/dispatcher.py`  
-
-- Corregidos imports entre módulos  
-- API validada:
-  - `/tools`  
-  - `/agent/run`  
-
-- Corregido esquema de request:
-  - `user_input` en lugar de `prompt`  
-
-- Introducida capa `AgentService`:  
-  API → Service → Runtime  
-
----
+- Continuó la auditoría del sistema sobre:
+  - planner
+  - policy engine
+  - tool registry
+  - base tool
+  - implementaciones de tools
+- Se verificó el flujo planner -> policy -> registry -> tool.
+- Se reorganizaron las tools hacia `tools/local/`.
+- Se añadieron directorios reservados o preparatorios:
+  - `clients/`
+  - `audit/`
+  - `runtime/dispatcher.py`
+- Se introdujo `AgentService` como capa de servicio separada.
 
 ## 2026-04-13
 
-- Auditoría técnica completa de módulos core:
-  - AgentService  
-  - AgentRuntime  
-  - Planner  
-  - PolicyEngine  
-  - ToolRegistry  
-  - BaseTool  
+- Se completó la auditoría técnica de:
+  - AgentService
+  - AgentRuntime
+  - Planner
+  - PolicyEngine
+  - ToolRegistry
+  - BaseTool
+- Se identificaron gaps críticos:
+  - contratos implícitos
+  - no enforcement de dry-run
+  - manejo limitado de errores en runtime
+  - salida de tools no estructurada
+  - policy name-based
+- Se reorganizó la documentación en:
+  - architecture
+  - vision
+  - planning
+  - operations
+  - audits
 
-- Gaps arquitectónicos críticos identificados:
-  - contratos implícitos entre componentes  
-  - `dry_run` no aplicado  
-  - sin manejo de errores en runtime  
-  - salidas de tools no estructuradas  
-  - policy limitada a whitelist por nombre de tool  
+## 2026-04-13 - Integración de Authentication y ExecutionContext
 
-- Documentación creada y alineada:
-  - `docs/architecture.md` (comportamiento verificado)  
-  - `docs/evolution_map.md`  
-  - `docs/modules/*`  
-  - `docs/audits/*`  
+- Se implementó autenticación por API key con alcance de request.
+- Se añadió `ExecutionContext`.
+- Se propagó el context a través de:
+  - route dependency
+  - AgentService
+  - AgentRuntime
+  - PolicyEngine
+  - tools
+- Se verificó el comportamiento de policy sensible a rol para `system_info`.
 
-- Estructura de documentación reorganizada:
-  - separación entre visión, planificación, operaciones y auditoría  
+## 2026-04-18 - Preservación de resultado estructurado
 
-- Roadmap de desarrollo definido:
-  - contratos → control → manejo de errores → desacoplamiento → evolución  
+- Se modificó:
+  - `app/schemas/responses.py`
+  - `app/runtime/orchestrator.py`
+- Se preservó la salida estructurada de las tools en `AgentResponse.result`.
+- Se mantuvo `message=str(result)` por compatibilidad hacia atrás.
 
----
+## 2026-04-19 - Skeleton experimental para expansión de tools con LLM
 
-## Próxima sesión
+- Se añadieron módulos experimentales aislados para:
+  - proposals de tools
+  - generación de tools
+  - staging registry
+  - audit store
+- Se añadió el flag de request `experimental_tool_generation`.
+- Se añadió señalización de capability gap en el planner.
+- Se añadió una rama de runtime controlada para:
+  - creación de proposals
+  - registro en staging
+  - generación de skeletons
+  - generación de artefactos de audit
+- Se mantuvo sin cambios el registry de tools de producción.
+- La integración real con LLM sigue sin implementarse.
 
-- Iniciar Fase 1: Refuerzo de contratos  
-- Añadir logging mínimo en el orquestador:
-  - request_id  
-  - tool seleccionada  
-  - decisión de policy  
-  - resultado de ejecución  
+## 2026-04-19 - Normalización de documentación
 
-### NO hacer
-
-- introducir ExecutionContext  
-- refactorizar la estructura de respuesta  
-- modificar tools en profundidad  
-
-### Objective
-Preserve structured tool output in the active `nucleo` response path without changing existing response semantics.
-
-### Files modified
-- `nucleo/app/schemas/responses.py`
-- `nucleo/app/runtime/orchestrator.py`
-
-### Problem detected
-`AgentRuntime.run()` was converting structured tool output to `str(result)` before returning `AgentResponse`.
-`AgentResponse` only exposed `status` and `message`, so structured output was lost before leaving the runtime.
-
-### Change applied
-Added an optional `result` field to `AgentResponse` and populated it in `AgentRuntime.run()`.
-Kept `message=str(result)` unchanged for backward compatibility.
-
-### Expected impact
-Existing clients can continue using `message`.
-New clients can consume structured tool output from `result`.
-
-### Risks / limitations
-- The payload is temporarily duplicated in `message` and `result`.
-- Serialization depends on tool outputs remaining JSON-serializable.
-
-### Validation status
-Patch applied.
-Runtime validation not executed in this step.
-
-### Next step
-Validate the `/agent/run` response shape and confirm clients can read `result` without affecting existing consumers.
+- Se auditó la documentación Markdown en todo el repositorio.
+- Se definieron capas documentales:
+  - arquitectura verificada
+  - visión objetivo
+  - operación
+  - auditorías
+  - session logs
+- Se normalizaron los documentos primarios bajo `docs/`.
+- Se marcó `docs_esp/` como traducción mantenida en lugar de fuente primaria verificada.
+- Se añadieron:
+  - `docs/audits/documentation_consistency_audit.md`
+  - `docs/operations/session_log_docs_normalization.md`

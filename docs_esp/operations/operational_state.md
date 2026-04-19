@@ -1,166 +1,110 @@
-# Estado operativo – NUCLEO
+> Archivo origen: `docs/operations/operational_state.md`
+> Última sincronización: `2026-04-19`
+
+# Estado operativo - NUCLEO
 
 ## Propósito
 
-Describir el estado operativo actual del sistema,
-incluyendo comportamiento verificado, limitaciones y reglas de trabajo.
-
----
+Describir el estado operativo actual del sistema usando solo comportamiento verificado en código o implicado directamente por la estructura del repositorio.
 
 ## Objetivo actual
 
-Construir un runtime de agentes mínimo y controlado en FastAPI capaz de:
+Operar un runtime agentic modular, mínimo y controlado sobre FastAPI, manteniendo la ruta de ejecución de producción comprensible y aislada de las capacidades experimentales de laboratorio.
 
-- recibir una petición  
-- mapearla a una tool mediante un planner  
-- validar la ejecución mediante una capa de policy  
-- ejecutar la tool  
-- devolver una respuesta  
+## Arquitectura actual verificada
 
-Objetivo:  
-Control y claridad por encima de complejidad.
-
----
-
-## Arquitectura actual (verificada)
-
-Flujo de ejecución:
+Flujo de producción:
 
 AgentRequest  
-→ AgentService  
-→ AgentRuntime  
-→ Planner  
-→ PolicyEngine  
-→ ToolRegistry  
-→ Tool  
-→ AgentResponse  
+-> AgentService  
+-> AgentRuntime  
+-> Planner  
+-> PolicyEngine  
+-> ToolRegistry  
+-> Tool  
+-> AgentResponse
 
----
+Rama experimental opt-in:
 
-## Componentes
+AgentRequest con `experimental_tool_generation=True`  
+-> Planner puede emitir `capability_gap_detected`  
+-> AgentRuntime gestiona proposal / staging / generación de skeleton  
+-> devuelve una respuesta controlada de `capability_gap`  
+-> el registry de producción no cambia
+
+## Componentes en operación actual
 
 ### API
-- Aplicación FastAPI  
-- Endpoint: `/agent/run`  
-- Endpoint de salud disponible  
+
+- aplicación FastAPI
+- `POST /agent/run`
+- `GET /tools`
+- `GET /`
 
 ### AgentService
-- Fachada ligera sobre el runtime  
-- Delega la ejecución  
 
-### Runtime (orquestador)
-- Coordina el flujo de ejecución:  
-  Planner → Policy → Registry → Tool  
+- fachada ligera sobre el runtime
+- delega la ejecución con request y execution context
+
+### Runtime
+
+- coordina planner, policy, registry y ejecución de tools
+- contiene la ruta actual de manejo de capability gap experimental
 
 ### Planner
-- Matching por substrings basado en reglas  
-- Devuelve un dict implícito: `{tool, payload}`  
 
-### Tool Registry
-- Registro basado en diccionario  
-- Resuelve tools por nombre  
+- basado en reglas
+- devuelve contratos implícitos tipo dict
+- puede emitir señal experimental de gap solo cuando la request hace opt-in explícito
 
-### Tools implementadas
-- echo  
-- system_info  
+### PolicyEngine
 
-### Policy Engine
-- Whitelist estática:  
-  - permite: echo, system_info  
-  - deniega el resto  
-- Ignora payload y dry_run  
+- deny-by-default sobre nombres de tools de producción
+- permite `echo`
+- permite `system_info` solo para contexto admin
 
-### Schemas
-- AgentRequest (user_input, dry_run)  
-- AgentResponse (status, message)  
+### Tools de producción
 
----
+- `echo`
+- `system_info`
+
+### Experimental Lab
+
+- ToolProposalService
+- ToolGenerationService
+- StagingRegistry
+- AuditStore
+- todo aislado bajo `runtime_lab/`
 
 ## Características técnicas verificadas
 
-- La salida del planner no está validada (contrato implícito)  
-- La policy no aplica modos de ejecución (`dry_run`)  
-- El runtime ejecuta tools incluso en dry_run  
-- Los resultados de tools se convierten a string (`str(result)`)  
-- El runtime no captura excepciones (planner, policy, tool)  
-- Los contratos de entrada/salida de tools son implícitos  
+- `ExecutionContext` forma actualmente parte del pipeline del runtime
+- `AgentResponse` expone actualmente `result` estructurado
+- el registro de tools de producción ocurre en tiempo de importación dentro del runtime orchestrator
+- la salida del planner sigue siendo implícita
+- `dry_run` aún no se impone de forma estructural en la ejecución de producción
+- la policy de producción no evalúa el payload en profundidad
+- las tools experimentales generadas no se auto-registran en producción
 
----
+## Restricciones operativas
 
-## Último punto estable
+- la ejecución local en una sola máquina es el modelo operativo explícito actual
+- las rutas de producción y laboratorio coexisten en el código, pero deben permanecer separadas
+- la generación experimental está gated por request, no es comportamiento ambiental
+- la simplicidad del runtime sigue siendo prioritaria frente a la expansión agresiva
 
-Commit:  
-3622055 (HEAD -> main, origin/main)  
+## Issues abiertos
 
-Estado:
-- `/agent/run` funciona  
-- tool echo funcional  
-- tool system_info funcional  
-- pipeline planner → policy → ejecución operativo  
-- respuesta simple (status + message)  
-
----
-
-## Trabajo completado
-
-- Base FastAPI inicializada  
-- AgentService implementado  
-- AgentRuntime implementado  
-- Planner integrado  
-- ToolRegistry implementado  
-- tool echo operativa  
-- tool system_info operativa  
-- Capa de policy introducida  
-- Ejecución end-to-end funcional  
-
----
-
-## Problemas abiertos (validados)
-
-- No hay plan de ejecución estructurado  
-- No hay validación de payload  
-- No hay salida estructurada de tools  
-- No hay trazabilidad de ejecución  
-- No hay manejo de errores en runtime  
-- `dry_run` no aplicado  
-- La policy no usa metadatos de tools  
-
----
-
-## Siguiente paso (ESTRICTO)
-
-Reconstrucción incremental, NO refactor completo.
-
-### Acción inmediata
-
-Añadir logging mínimo dentro del orquestador:
-
-- log de request_id  
-- log de tool seleccionada  
-- log de decisión de policy  
-- log de resultado de ejecución  
-
-### NO hacer
-
-- introducir ExecutionContext todavía  
-- refactorizar estructura de respuesta  
-- modificar tools en profundidad  
-
----
-
-## Restricciones
-
-- Ejecución en una sola máquina (local)  
-- Debe mantenerse comprensible  
-- Cambios incrementales  
-- Cada cambio debe ser testeable vía `/agent/run`  
-
----
+- no existe un execution plan tipado explícito
+- no hay validación completa de payload por tool
+- no existe una taxonomía completa de errores estructurados en runtime
+- no hay un audit trail integrado para producción
+- no existe workflow de promoción a producción para tools generadas en laboratorio
+- la semántica de `dry_run` sigue incompleta
 
 ## Reglas de trabajo
 
-- Un cambio = un commit  
-- Sin refactors grandes  
-- Testear siempre vía `/agent/run`  
-- Actualizar SESSION_LOG.md tras cada sesión  
-- Actualizar development_plan.md antes de terminar  
+- mantener estable primero el runtime de producción
+- tratar `docs/architecture.md` como fuente de verdad para comportamiento verificado
+- tratar `docs/vision/architecture_vision.md` como documento solo de futuro
+- tratar el laboratorio experimental como aislado y no productivo por defecto

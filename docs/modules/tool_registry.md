@@ -1,39 +1,41 @@
 # ToolRegistry
 
+## Layer
+
+Verified architecture
+
 ## Purpose
-Central registry of available tools in the system.
 
-## Real Behavior
-`ToolRegistry` stores tool instances in an internal dictionary keyed by `tool.name`.
+Resolve production tools by name from the current in-memory production registry.
 
-Behavior:
-- `register(tool)`: stores the tool under its name
-- `get(tool_name)`: returns the matching tool or `None`
-- `list_tools()`: returns all registered tool instances
+## Verified Current Behavior
 
-## Strengths
-- Simple and efficient dictionary-based lookup
-- Clear separation of responsibility
-- Appropriate complexity for a small bootstrap system
-- Easy to understand and test
+`ToolRegistry` stores tool instances in a dictionary keyed by `tool.name`.
 
-## Issues Detected
-- Duplicate tool names silently overwrite previous registrations
-- No strict runtime validation of tool type or tool name
-- Tool name contract is implicit but critical
-- `get()` delegates missing-tool handling downstream
-- `list_tools()` exposes live tool instances
-- No metadata-oriented introspection support
-- No distinction between bootstrap-time and runtime mutation
+Supported operations:
 
-## Risk Level
-Medium
+- `register(tool)`
+- `get(tool_name)`
+- `list_tools()`
 
-## Recommended Improvements
-- Reject duplicate registrations
-- Validate tool contract at registration time
-- Type internal storage explicitly
-- Document the `get()` missing-tool behavior
-- Add helper methods such as `has()` or `list_tool_names()`
-- Prepare registry usage for metadata-based policy and documentation
+## Important Distinction
 
+This registry is the production registry. It is separate from:
+
+- `runtime_lab/`
+- staging registry
+- proposal store
+- generated tool skeletons
+
+Generated lab tools are not auto-registered here.
+
+## Current Limitations
+
+- duplicate names overwrite silently
+- tool contract is not strongly validated at registration time
+- runtime mutation and bootstrap-time mutation are not clearly separated
+
+## Status Label
+
+- Production registry: implemented
+- Staging / promotion integration: not implemented in production registry

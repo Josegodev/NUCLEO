@@ -1,34 +1,40 @@
 # AgentService
 
+## Layer
+
+Verified architecture
+
 ## Purpose
-High-level service layer that exposes a stable execution entrypoint for the agent system.
 
-## Real Behavior
-`AgentService` instantiates `AgentRuntime` and delegates execution through `run(request)`.
-It does not implement planning, policy, tool selection, or transport logic.
+Provide a stable service-layer facade between API routes and runtime orchestration.
 
-## Dependencies
-- `AgentRuntime`
-- `AgentRequest`
-- `AgentResponse`
+## Verified Current Behavior
 
-## Current Strengths
-- Clear separation from API routes
-- Minimal logic
-- Good placeholder for future growth
+`AgentService` currently:
 
-## Issues Detected
-- Direct instantiation of runtime creates tight coupling
-- No explicit error normalization
-- Type contract depends entirely on runtime correctness
-- Documentation is more ambitious than the current implementation
+- instantiates `AgentRuntime`
+- exposes `run(request, context)`
+- delegates execution directly to runtime
 
-## Risk Level
-Medium
+It does not currently own:
 
-## Recommended Improvements
-- Allow runtime dependency injection
-- Add controlled error boundary
-- Keep documentation aligned with actual behavior
-- Use this layer as future entrypoint for tracing and execution context
+- planning
+- policy
+- tool execution
+- lab proposal generation logic
 
+## Strengths
+
+- Keeps API thin
+- Preserves a stable entrypoint
+- Clean place for future tracing or orchestration hooks
+
+## Current Limitations
+
+- Runtime dependency is still constructed directly
+- No independent error normalization boundary yet
+
+## Status Label
+
+- Service facade: implemented
+- Dependency injection boundary: not implemented

@@ -1,46 +1,59 @@
+> Archivo origen: `docs/modules/orchestrator.md`
+> Última sincronización: `2026-04-19`
+
 # AgentRuntime
 
+## Capa
+
+Arquitectura verificada
+
 ## Propósito
-Orquestador central de ejecución del runtime modular de agentes.
 
-## Comportamiento real
-El runtime recibe un `AgentRequest`, solicita un plan al planner, evalúa la policy, resuelve la tool desde el registry, la ejecuta y devuelve un `AgentResponse`.
+Orquestador central de ejecución del runtime de producción, con una rama aislada mínima para el manejo experimental de capability gaps.
 
-Flujo de ejecución actual:
-1. `planner.create_plan(request)`  
-2. Extrae `plan["tool"]` y `plan["payload"]`  
-3. `policy_engine.evaluate(tool_name, payload, dry_run)`  
-4. Si se deniega, devuelve `blocked`  
-5. Resuelve la tool desde el registry  
-6. Si no existe, devuelve `error`  
-7. Ejecuta `tool.run(payload)`  
-8. Devuelve `success` o `dry_run_success`  
+## Comportamiento actual verificado
 
-## Fortalezas
-- Pipeline claro  
-- La policy se aplica antes de la ejecución  
-- Las tools desconocidas se gestionan explícitamente  
-- Lógica de orquestación legible  
+`AgentRuntime.run(request, context)` actualmente:
 
-## Problemas detectados
-- El contrato de salida del planner es implícito y no está validado  
-- No hay manejo de excepciones en planner, policy ni ejecución de tools  
-- `dry_run` no está garantizado estructuralmente por el runtime  
-- Inicialización global tipo singleton en tiempo de importación del módulo  
-- El runtime está acoplado a tools concretas y lógica de bootstrap  
-- Los resultados de las tools se convierten a `str`, perdiendo estructura  
-- No hay validación de payload por tool  
-- Las respuestas de error son demasiado genéricas  
+1. pide un plan al planner
+2. si el plan señala `capability_gap_detected`, deriva a la ruta aislada del laboratorio
+3. en caso contrario extrae `tool` y `payload` de producción
+4. pide autorización al `PolicyEngine`
+5. si la policy deniega, devuelve `blocked`
+6. resuelve la tool desde el `ToolRegistry` de producción
+7. si falta, devuelve `error`
+8. ejecuta `tool.run(payload, context=context)`
+9. devuelve `AgentResponse`
 
-## Nivel de riesgo
-Alto
+## Rama experimental verificada
 
-## Mejoras recomendadas
-- Introducir un esquema explícito de plan de ejecución  
-- Añadir manejo controlado de errores por etapa del pipeline  
-- Aplicar `dry_run` de forma estructural  
-- Inyectar planner, policy engine y registry  
-- Mover el registro de tools a la capa de bootstrap  
-- Devolver salidas de tools estructuradas  
-- Añadir contratos de validación de payload  
-- Mejorar trazabilidad y modelado de errores de dominio  
+El runtime compone actualmente servicios de laboratorio en tiempo de importación del módulo y, para requests opt-in, puede:
+
+- crear una proposal
+- registrarla en staging
+- generar un skeleton de tool
+- escribir eventos de audit
+- devolver una respuesta controlada de `capability_gap`
+
+Esto no registra la tool en el registry de producción.
+
+## Fortalezas actuales
+
+- pipeline de producción claro
+- comprobación explícita de policy antes de ejecutar una tool de producción
+- manejo explícito de tool de producción ausente
+- la rama experimental permanece aislada del registry de producción
+
+## Limitaciones actuales
+
+- el contrato del planner sigue siendo implícito
+- la composición del runtime sigue ocurriendo en tiempo de importación
+- el manejo de excepciones es limitado
+- `dry_run` aún no se impone de forma estructural para tools de producción
+- la respuesta sigue duplicando datos entre `message` y `result`
+
+## Etiqueta de estado
+
+- Ruta de producción: implementada
+- Ruta de manejo de gaps en laboratorio: experimental
+- Endurecimiento completo de contratos: no implementado

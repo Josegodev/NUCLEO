@@ -1,30 +1,16 @@
-# Operational State – NUCLEO
+# Operational State - NUCLEO
 
 ## Purpose
 
-Describe the current operational state of the system,
-including verified behavior, constraints, and working rules.
-
----
+Describe the current operational state of the system using only behavior that is verified in code or directly implied by repository structure.
 
 ## Current Objective
 
-Build a minimal, controlled agent runtime in FastAPI capable of:
+Operate a minimal, controlled modular agent runtime on FastAPI while keeping the production execution path understandable and isolated from experimental lab capabilities.
 
-- receiving a request
-- mapping it to a tool via a planner
-- validating execution via a policy layer
-- executing the tool
-- returning a response
+## Current Verified Architecture
 
-Goal:
-Control and clarity over complexity.
-
----
-
-## Current Architecture (verified)
-
-Execution flow:
+Production flow:
 
 AgentRequest  
 → AgentService  
@@ -33,135 +19,89 @@ AgentRequest
 → PolicyEngine  
 → ToolRegistry  
 → Tool  
-→ AgentResponse  
+→ AgentResponse
 
----
+Experimental opt-in branch:
 
-## Components
+AgentRequest with `experimental_tool_generation=True`  
+→ Planner may emit `capability_gap_detected`  
+→ AgentRuntime handles proposal / staging / skeleton generation  
+→ returns controlled `capability_gap` response  
+→ production registry unchanged
+
+## Components in Current Operation
 
 ### API
+
 - FastAPI application
-- Endpoint: `/agent/run`
-- Health endpoint available
+- `POST /agent/run`
+- `GET /tools`
+- `GET /`
 
 ### AgentService
-- Thin façade over runtime
-- Delegates execution
 
-### Runtime (orchestrator)
-- Coordinates execution flow:
-  Planner → Policy → Registry → Tool
+- Thin facade over runtime
+- Delegates execution with request and execution context
+
+### Runtime
+
+- Coordinates planner, policy, registry, tool execution
+- Contains current experimental capability-gap handling path
 
 ### Planner
-- Rule-based substring matching
-- Returns implicit dict: `{tool, payload}`
 
-### Tool Registry
-- Dictionary-based registry
-- Resolves tools by name
+- Rule-based
+- Returns implicit dict contracts
+- Can emit experimental gap signal only when request explicitly opts in
 
-### Tools implemented
-- echo
-- system_info
+### PolicyEngine
 
-### Policy Engine
-- Static whitelist:
-  - allows: echo, system_info
-  - denies all others
-- Ignores payload and dry_run
+- Deny-by-default on production tool names
+- Allows `echo`
+- Allows `system_info` only for admin context
 
-### Schemas
-- AgentRequest (user_input, dry_run)
-- AgentResponse (status, message)
+### Production Tools
 
----
+- `echo`
+- `system_info`
+
+### Experimental Lab
+
+- Proposal generation service
+- Tool skeleton generation service
+- Staging registry
+- Audit store
+- All isolated under `runtime_lab/`
 
 ## Verified Technical Characteristics
 
-- Planner output is not validated (implicit contract)
-- Policy does not enforce execution mode (`dry_run`)
-- Runtime executes tools even in dry_run
-- Tool results are stringified (`str(result)`)
-- Runtime does not catch exceptions (planner, policy, tool)
-- Tool input/output contracts are implicit
+- `ExecutionContext` is currently part of the runtime pipeline
+- `AgentResponse` currently exposes structured `result`
+- Production tool registration happens at module import time in runtime orchestrator
+- Planner output remains implicit
+- `dry_run` is still not structurally enforced for production execution
+- Production policy does not deeply evaluate payload
+- Experimental generated tools are not auto-registered in production
 
----
+## Operational Constraints
 
-## Last Stable Point
+- Single-machine local execution is the current explicit operating model
+- Production and lab paths coexist in the codebase but must remain separated
+- Experimental generation is request-gated, not ambient behavior
+- Runtime simplicity is still prioritized over aggressive expansion
 
-Commit:
-3622055 (HEAD -> main, origin/main)
+## Open Issues
 
-State:
-- /agent/run works
-- echo tool works
-- system_info tool works
-- planner → policy → execution pipeline functional
-- response is simple (status + message)
-
----
-
-## Work Completed
-
-- FastAPI base initialized
-- AgentService implemented
-- AgentRuntime implemented
-- Planner integrated
-- ToolRegistry implemented
-- echo tool working
-- system_info tool working
-- Policy layer introduced
-- End-to-end execution working
-
----
-
-## Open Issues (validated)
-
-- No structured execution plan
-- No payload validation
-- No structured tool output
-- No execution trace
-- No error handling in runtime
-- `dry_run` not enforced
-- Policy not using tool metadata
-
----
-
-## Next Step (STRICT)
-
-Rebuild incrementally, NOT full refactor.
-
-### Immediate action
-
-Add minimal logging inside orchestrator:
-
-- log request_id
-- log selected tool
-- log policy decision
-- log execution result
-
-### Do NOT
-
-- introduce ExecutionContext yet
-- refactor response structure
-- modify tools deeply
-
----
-
-## Constraints
-
-- Single-machine execution (local)
-- Must remain understandable
-- Changes must be incremental
-- Each change testable via `/agent/run`
-
----
+- No explicit typed execution plan
+- No complete payload validation per tool
+- No full structured runtime error taxonomy
+- No integrated production audit trail
+- No production promotion workflow for lab-generated tools
+- `dry_run` semantics still incomplete
 
 ## Working Rules
 
-- One change = one commit
-- No large refactors
-- Always test via `/agent/run`
-- Update SESSION_LOG.md after each session
-- Update development_plan.md before stopping
-
+- Keep production runtime stable first
+- Treat `docs/architecture.md` as source of truth for verified behavior
+- Treat `docs/vision/architecture_vision.md` as future-only
+- Treat experimental lab as isolated and non-production by default

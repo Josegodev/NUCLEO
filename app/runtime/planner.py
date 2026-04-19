@@ -39,6 +39,7 @@ input → planner → policy → execution
 """
 
 from app.schemas.requests import AgentRequest
+from app.schemas.tool_proposal import CapabilityGapSignal
 
 
 class Planner:
@@ -48,12 +49,53 @@ class Planner:
         if "system" in normalized_input or "info" in normalized_input:
             return {
                 "tool": "system_info",
-                "payload": {}
+                "payload": {},
+                "mode": "existing_tool",
+            }
+
+        if request.experimental_tool_generation and self._looks_like_capability_gap(
+            normalized_input
+        ):
+            gap = CapabilityGapSignal(
+                capability_name=self._infer_capability_name(normalized_input),
+                reason=(
+                    "Planner did not find a production tool for the requested capability."
+                ),
+                proposal_generation_requested=True,
+            )
+            return {
+                "tool": None,
+                "payload": {},
+                "mode": gap.type,
+                "original_input": request.user_input,
+                "capability_gap": gap.dict(),
             }
 
         return {
             "tool": "echo",
             "payload": {
                 "text": request.user_input
-            }
+            },
+            "mode": "existing_tool",
         }
+
+    @staticmethod
+    def _looks_like_capability_gap(normalized_input: str) -> bool:
+        hint_tokens = {
+            "create",
+            "build",
+            "fetch",
+            "search",
+            "query",
+            "calculate",
+            "generate",
+            "integrate",
+        }
+        return any(token in normalized_input for token in hint_tokens)
+
+    @staticmethod
+    def _infer_capability_name(normalized_input: str) -> str:
+        words = [word for word in normalized_input.split() if word.isascii()]
+        if not words:
+            return "unclassified_capability"
+        return "_".join(words[:4])

@@ -1,42 +1,21 @@
-cat > SESSION_LOG.md << 'EOF'
 # Session Log
-
----
 
 ## 2026-04-10
 
-- Implemented runtime orchestration
-- Added echo and system_info tools
-- Introduced policy layer
-- Attempted execution context integration
-- Rolled back due to excessive refactor complexity
-
-### Rollback
-
-- Reverted to last stable commit
-- Identified need for controlled incremental changes
-- Introduced project state tracking files
-
----
+- Implemented runtime orchestration.
+- Added `echo` and `system_info` tools.
+- Introduced a first policy layer.
+- Attempted execution-context integration.
+- Rolled back the first context attempt due to excessive refactor scope.
 
 ## 2026-04-11
 
-- Performed architectural audit of:
-  - main.py
-  - api/routes/agent.py
-  - runtime/orchestrator.py
-
-- Clarified system structure:
-  API → AgentService → Runtime → Planner → Policy → Registry → Tool → Response
-
-- Identified architectural roles:
-  - API = entrypoint
-  - AgentService = façade
-  - Runtime = orchestrator
-  - Planner = decision layer
-  - Policy = control layer
-  - Tools = execution layer
-
+- Audited:
+  - `main.py`
+  - `api/routes/agent.py`
+  - `runtime/orchestrator.py`
+- Clarified runtime structure:
+  - API → AgentService → Runtime → Planner → Policy → Registry → Tool → Response
 - Identified limitations:
   - no execution tracing
   - global dependencies in runtime
@@ -44,198 +23,92 @@ cat > SESSION_LOG.md << 'EOF'
   - basic policy engine
   - response not structured
 
-- Paused audit due to hardware limitations
-
----
-
 ## 2026-04-12
 
-- Continued full system audit:
-  - planner.py
-  - policies/engine.py
-  - tools/registry.py
-  - tools/base.py
-  - tools implementations
-
-- Verified execution flow:
-  Planner → Policy → Registry → Tool.run()
-
-- Added minimal docstrings to core modules
-
-- Fixed structural issues:
-  - removed unused root-level agent.py
-
-- Identified code quality issues:
-  - missing docstrings
-  - formatting inconsistencies
-
-### Tools Refactor
-
-- Moved tools to `tools/local/`
-- Prepared `tools/remote/`
-- Added:
+- Continued system audit over:
+  - planner
+  - policy engine
+  - tool registry
+  - base tool
+  - tool implementations
+- Verified planner → policy → registry → tool flow.
+- Restructured tools toward `tools/local/`.
+- Added reserved or preparatory directories:
   - `clients/`
   - `audit/`
   - `runtime/dispatcher.py`
-
-- Fixed imports across modules
-- API validated:
-  - `/tools`
-  - `/agent/run`
-
-- Fixed request schema:
-  - `user_input` instead of `prompt`
-
-- Introduced `AgentService` layer:
-  API → Service → Runtime
-
----
+- Introduced `AgentService` as a separate service layer.
 
 ## 2026-04-13
 
-- Completed full technical audit of core modules:
+- Completed technical audit of:
   - AgentService
   - AgentRuntime
   - Planner
   - PolicyEngine
   - ToolRegistry
   - BaseTool
+- Identified critical gaps:
+  - implicit contracts
+  - no enforced dry-run
+  - limited runtime error handling
+  - unstructured tool output
+  - name-based policy
+- Reorganized documentation into:
+  - architecture
+  - vision
+  - planning
+  - operations
+  - audits
 
-- Identified critical architectural gaps:
-  - implicit contracts between components
-  - `dry_run` not enforced
-  - no error handling in runtime
-  - tool outputs not structured
-  - policy limited to tool-name whitelist
+## 2026-04-13 - Authentication and ExecutionContext Integration
 
-- Created and aligned documentation:
-  - `docs/architecture.md` (verified behavior)
-  - `docs/evolution_map.md`
-  - `docs/modules/*`
-  - `docs/audits/*`
-
-- Reorganized documentation structure:
-  - separated vision, planning, operations, and audits
-
-- Defined development roadmap:
-  - contracts → control → error handling → decoupling → evolution
-
----
-
-## Next Session
-
-- Start Phase 1: Contract Reinforcement
-- Add minimal logging in orchestrator:
-  - request_id
-  - selected tool
-  - policy decision
-  - execution result
-
-### Do NOT
-
-- introduce ExecutionContext
-- refactor response structure
-- modify tools deeply
-
-## Session milestone — API key auth + ExecutionContext integrated
-
-Date: 2026-04-13
-
-### Completed
-Implemented request-scoped authentication and execution context propagation across the runtime pipeline.
-
-### Changes introduced
-- Added `ExecutionContext` model
-- Added API key authentication via FastAPI `HTTPBearer`
-- Added auth dependency in agent route
-- Propagated `context` through:
-  - `AgentService`
-  - `AgentRuntime`
-  - `PolicyEngine`
+- Implemented request-scoped API-key authentication.
+- Added `ExecutionContext`.
+- Propagated context through:
+  - route dependency
+  - AgentService
+  - AgentRuntime
+  - PolicyEngine
   - tools
-- Updated base tool contract to:
-  - `run(payload, context=None)`
-- Updated local tools:
-  - `echo`
-  - `system_info`
-- Added basic role-aware policy checks
-- Verified Swagger auth flow and successful execution of `system_info`
+- Verified role-aware policy behavior for `system_info`.
 
-### Current execution flow
-HTTP request
-→ auth dependency
-→ ExecutionContext
-→ AgentService
-→ AgentRuntime
-→ PolicyEngine
-→ Tool
-→ AgentResponse
+## 2026-04-18 - Structured Result Preservation
 
-### Verified working
-- `dev-jose-key` can run `system_info`
-- auth is enforced per request
-- context reaches tools correctly
-- policy blocks unauthorized users as expected
+- Modified:
+  - `app/schemas/responses.py`
+  - `app/runtime/orchestrator.py`
+- Preserved structured tool output in `AgentResponse.result`.
+- Kept `message=str(result)` for backward compatibility.
 
-### Current limitations
-- `AgentResponse` still returns tool output as `str(result)`
-- response is not yet structured JSON for tool data
-- API keys are still hardcoded in config
-- audit logging is not yet integrated
-- persistence layer not implemented
+## 2026-04-19 - Experimental LLM Tool Expansion Skeleton
 
-### Next recommended step
-Refactor `AgentResponse` to return structured output:
-- `status`
-- `message`
-- `data`
-- `request_id`
-- `user`
+- Added isolated experimental modules for:
+  - tool proposals
+  - tool generation
+  - staging registry
+  - audit store
+- Added `experimental_tool_generation` request flag.
+- Added planner capability-gap signaling.
+- Added controlled runtime branch for:
+  - proposal creation
+  - staging registration
+  - skeleton generation
+  - audit artifact generation
+- Kept production tool registry unchanged.
+- Real LLM integration remains unimplemented.
 
-### Why this is the next step
-Current response serialization loses structure and makes the API harder to consume, audit, and extend.
+## 2026-04-19 - Documentation Normalization
 
-### Files added
-- `app/schemas/context.py`
-- `app/core/config.py`
-- `app/core/auth.py`
-- `app/api/deps/auth.py`
-
-### Files modified
-- `app/api/routes/agent.py`
-- `app/services/agent_service.py`
-- `app/runtime/orchestrator.py`
-- `app/policies/engine.py`
-- `app/tools/base.py`
-- `app/tools/local/system_info_tool.py`
-- `app/tools/local/echo_tool.py`
-
-### [2026-04-18] Change: Preserve structured response in active nucleo runtime
-
-- Objective:
-  Ensure structured tool outputs are not lost before leaving the runtime in the active nucleo application.
-
-- Files modified:
-  - `nucleo/app/schemas/responses.py`
-  - `nucleo/app/runtime/orchestrator.py`
-
-- Problem detected:
-  `AgentRuntime.run()` converted structured tool output to `str(result)` and `AgentResponse` only exposed `status` and `message`, causing loss of machine-readable data.
-
-- Change applied:
-  Added optional `result` field to `AgentResponse` and populated it with the original structured output while preserving `message=str(result)` for backward compatibility.
-
-- Expected impact:
-  API responses now expose both human-readable (`message`) and structured (`result`) outputs, enabling downstream processing and future auditability.
-
-- Risks / limitations:
-  - Payload duplication (`message` + `result`)
-  - Requires tool outputs to remain JSON-serializable
-  - `message` still acts as legacy field
-
-- Validation status:
-  Runtime validated against active nucleo app via HTTP.
-  Response includes structured `result` without breaking existing behavior.
-
-- Next step:
-  Implement real `dry_run` semantics in nucleo runtime (skip tool execution and return preview response).
+- Audited Markdown documentation across the repository.
+- Defined documentation layers:
+  - verified architecture
+  - target vision
+  - operations
+  - audits
+  - session logs
+- Normalized primary docs under `docs/`.
+- Marked `docs_esp/` as translation mirror rather than primary verified source.
+- Added:
+  - `docs/audits/documentation_consistency_audit.md`
+  - `docs/operations/session_log_docs_normalization.md`

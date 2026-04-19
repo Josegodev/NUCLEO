@@ -1,0 +1,1 @@
+"""Tool proposal domain models."""

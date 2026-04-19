@@ -1,184 +1,90 @@
-# Development Plan – NUCLEO
+# Development Plan - NUCLEO
 
 ## Purpose
 
-Define the next technical steps after completing the full system audit.
+Define the next technical steps from the currently verified repository state without presenting future goals as implemented behavior.
 
-The system is now understood.  
-The next phase is to reinforce contracts, control, and robustness before adding new features.
+## Current Base
 
----
+Verified today:
 
-## Current Status
+- stable production runtime path
+- request-scoped authentication with execution context
+- structured `result` preserved in response
+- isolated experimental lab for tool proposal and skeleton generation
 
-Audit completed for:
+## Current Priorities
 
-- AgentService
-- AgentRuntime (orchestrator)
-- Planner
-- PolicyEngine
-- ToolRegistry
-- BaseTool
-
-Documentation created:
-
-- architecture.md (verified behavior)
-- evolution_map.md
-- modules audit
-- repo audit
-
----
-
-## Phase 1 — Contract Reinforcement (HIGH PRIORITY)
+### Priority 1 - Contract Reinforcement
 
 Objective:
-Eliminate implicit contracts and make system behavior explicit.
+Reduce implicit contracts in production runtime.
 
 Actions:
 
-- Introduce `ExecutionPlan` (replace dict in planner)
-- Define structured tool output (avoid `str(result)`)
-- Define payload schemas per tool
-- Strengthen BaseTool as abstract interface
+- introduce typed execution plan
+- define stronger tool payload contracts
+- define stronger tool result contract
+- strengthen `BaseTool`
 
----
-
-## Phase 2 — Execution Control (HIGH PRIORITY)
+### Priority 2 - Execution Control
 
 Objective:
-Ensure safe and predictable execution.
+Make execution semantics safer and more explicit.
 
 Actions:
 
-- Enforce `dry_run` at runtime or policy level
-- Use `read_only` and `risk_level` in policy decisions
-- Prevent execution of unsafe tools in dry_run
+- enforce meaningful `dry_run`
+- use `read_only` and `risk_level` in policy decisions
+- prepare payload-aware restrictions
 
----
-
-## Phase 3 — Error Handling (HIGH PRIORITY)
+### Priority 3 - Runtime Robustness
 
 Objective:
-Guarantee controlled system behavior under failure.
+Make the production runtime resilient under failure.
 
 Actions:
 
-- Add try/catch per pipeline stage:
-  - planner
-  - policy
-  - tool execution
-- Standardize error responses
-- Ensure runtime always returns AgentResponse
+- add controlled exception handling by pipeline stage
+- standardize error responses
+- improve domain-level traceability
 
----
-
-## Phase 4 — Dependency Decoupling (MEDIUM PRIORITY)
+### Priority 4 - Composition Cleanup
 
 Objective:
-Remove hidden coupling and improve testability.
+Separate bootstrap from orchestration.
 
 Actions:
 
-- Inject planner, policy engine, and registry into runtime
-- Move tool registration out of orchestrator module
-- Prepare bootstrap/composition layer
+- inject planner, policy engine, and registry into runtime
+- move composition logic out of orchestrator module
+- prepare a dedicated bootstrap layer
 
----
-
-## Phase 5 — Minimal Observability (MEDIUM PRIORITY)
+### Priority 5 - Experimental Lab Maturation
 
 Objective:
-Make system behavior traceable.
+Make the lab path reviewable and operationally clearer without promoting it to production.
 
 Actions:
 
-- Log:
-  - selected tool
-  - policy decision
-  - execution result
-- Prepare ExecutionContext (later)
+- improve proposal schema quality
+- improve staging review workflow
+- improve generated artifact metadata
+- add explicit approval/promotion design without activation
 
----
+## Explicitly Future, Not Current
 
-## Phase 6 — Persistence (DATABASE) (MEDIUM PRIORITY)
+The following are not current production capabilities:
 
-Objective:
-Introduce persistence to store system state, executions, and traceability.
-
-Context:
-The system is currently fully stateless.  
-There is no storage for executions, results, or context.
-
-Initial scope (minimal, no overengineering):
-
-- Record runtime executions:
-  - request_id
-  - user_input
-  - selected tool
-  - policy decision
-  - result
-  - timestamp
-
-- Persist structured logs (as an alternative or complement to plain logging)
-
-Technical decisions to define:
-
-- Database type:
-  - SQLite (local, simple, recommended to start)
-  - PostgreSQL (if scaling to multi-environment)
-
-- Minimal data model:
-  - ExecutionRecord
-  - (optional) ToolExecution
-  - (optional) PolicyDecisionLog
-
-- Integration strategy:
-  - DO NOT couple directly to the runtime core
-  - introduce a future layer (`storage/` or `persistence/`)
-  - use a simple interface (lightweight repository pattern)
-
-Constraints:
-
-- Do not introduce a complex ORM at this stage
-- Do not break runtime simplicity
-- Persistence must be optional (feature toggle possible)
-
-Expected impact:
-
-- Real execution traceability
-- Foundation for advanced debugging
-- Preparation for auditing and analysis
-- Future base for memory/state (without implementing it yet)
----
-
-## Phase 7 — Planner & Policy Evolution (LOW PRIORITY)
-
-Only after previous phases are complete.
-
-Actions:
-
-- Improve planner logic (rules → structured matching)
-- Move policy from tool-name allowlist to metadata-based rules
-
----
-
-## Not Allowed Yet
-
-Do NOT introduce:
-
-- LLM-based planner
-- multi-step execution
-- memory/state
-- distributed execution
-
-Reason:
-The system still relies on fragile implicit contracts.
-
----
+- real LLM-backed planning
+- autonomous tool activation
+- production self-extension
+- dynamic package installation
+- arbitrary shell execution
+- production memory/state orchestration
 
 ## Guiding Principle
 
 Stabilize before expanding.
 
-The current system is modular and correct in structure,  
-but must become robust before increasing complexity.
+The production runtime should become more explicit and controlled before experimental capabilities become more ambitious.

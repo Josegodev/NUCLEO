@@ -1,33 +1,43 @@
+> Archivo origen: `docs/modules/agent_service.md`
+> Última sincronización: `2026-04-19`
+
 # AgentService
 
+## Capa
+
+Arquitectura verificada
+
 ## Propósito
-Capa de servicio de alto nivel que expone un punto de entrada estable para la ejecución del sistema de agentes.
 
-## Comportamiento real
-`AgentService` instancia `AgentRuntime` y delega la ejecución mediante `run(request)`.  
-No implementa lógica de planificación, policy, selección de tools ni transporte.
+Proporcionar una fachada estable de capa de servicio entre las rutas de API y la orquestación del runtime.
 
-## Dependencias
-- `AgentRuntime`  
-- `AgentRequest`  
-- `AgentResponse`  
+## Comportamiento actual verificado
 
-## Fortalezas actuales
-- Separación clara respecto a las rutas de API  
-- Lógica mínima  
-- Buen punto de extensión para crecimiento futuro  
+`AgentService` actualmente:
 
-## Problemas detectados
-- La instanciación directa del runtime genera acoplamiento fuerte  
-- No hay normalización explícita de errores  
-- El contrato de tipos depende completamente de la corrección del runtime  
-- La documentación es más ambiciosa que la implementación actual  
+- instancia `AgentRuntime`
+- expone `run(request, context)`
+- delega la ejecución directamente al runtime
 
-## Nivel de riesgo
-Medio
+Actualmente no asume:
 
-## Mejoras recomendadas
-- Permitir inyección de dependencias del runtime  
-- Añadir una capa controlada de manejo de errores  
-- Mantener la documentación alineada con el comportamiento real  
-- Usar esta capa como punto de entrada futuro para trazabilidad y contexto de ejecución  
+- planificación
+- policy
+- ejecución de tools
+- lógica de generación de proposals del laboratorio
+
+## Fortalezas
+
+- mantiene la API ligera
+- preserva un entrypoint estable
+- es un lugar limpio para futuros hooks de tracing u orquestación
+
+## Limitaciones actuales
+
+- la dependencia del runtime sigue construyéndose directamente
+- todavía no existe una frontera independiente de normalización de errores
+
+## Etiqueta de estado
+
+- Fachada de servicio: implementada
+- Frontera de inyección de dependencias: no implementada

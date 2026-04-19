@@ -1,115 +1,109 @@
+> Archivo origen: `docs/vision/architecture_vision.md`
+> Última sincronización: `2026-04-19`
+
 # Visión de arquitectura
 
 ## Propósito
 
-Este documento describe la arquitectura objetivo del sistema.
+Este documento describe la arquitectura objetivo de NUCLEO. Está orientado de forma intencional al futuro y no debe leerse como una afirmación de comportamiento actual verificado.
 
-Representa el diseño deseado y puede diferir de la implementación actual.
+Para el comportamiento implementado, ver:
 
-Para comportamiento verificado, ver:  
-`docs/architecture.md`
+- `docs/architecture.md`
 
----
+## Dirección objetivo
 
-## Visión general del sistema
+NUCLEO debería evolucionar hacia un runtime agentic modular con:
 
-Este proyecto es un backend de agentes modulares construido con FastAPI.
-
-El objetivo es:
-- recibir una petición  
-- decidir qué tool utilizar  
-- validar la ejecución  
-- ejecutar la tool  
-- devolver una respuesta estructurada  
-
----
+- contratos internos explícitos
+- semántica de ejecución controlada
+- planificación de ejecución tipada
+- enforcement de policy más rico
+- orquestación auditable
+- superficies experimentales aisladas para crecimiento de capacidades asistido por LLM
 
 ## Flujo objetivo
 
-Request → API → AgentService → Runtime → Planner → PolicyEngine → ToolRegistry → Tool → Response  
+Request  
+-> API  
+-> AgentService  
+-> Runtime  
+-> Planner  
+-> PolicyEngine  
+-> ToolRegistry  
+-> Tool  
+-> AgentResponse
 
----
+La forma objetivo preserva el pipeline estable, pero refuerza la calidad de los contratos y el control operativo en cada etapa.
 
-## Componentes (diseño objetivo)
+## Diseño objetivo de componentes
 
 ### API
-- Punto de entrada FastAPI  
-- Gestiona el transporte HTTP  
-- Delega en AgentService  
+
+- Solo frontera de transporte
+- Autenticación y validación de requests en el borde
+- Sin lógica de ejecución de negocio
 
 ### AgentService
-- Capa de aplicación estable  
-- Punto de entrada de ejecución  
-- Desacopla la API del runtime  
 
-### Runtime (Orquestador)
-- Coordinador central de ejecución  
-- Ejecuta:  
-  Planner → Policy → Tool → Response  
+- Entrypoint estable de aplicación
+- Fachada del runtime
+- Futuros hooks de tracing y orquestación
+
+### Runtime
+
+- Capa central de orquestación
+- Manejo explícito de planes
+- Semántica de fallo controlada
+- Ramificación aislada entre runtime de producción y flujos experimentales de laboratorio
 
 ### Planner
-- Mapea input de usuario a tool + payload  
-- Objetivo:
-  - lógica de planificación estructurada y extensible  
 
-### Policy Engine
-- Controla permisos de ejecución  
-- Objetivo:
-  - reglas sensibles al payload  
-  - decisiones basadas en riesgo  
-  - aplicación de `dry_run`  
+- Evolucionar desde reglas ad hoc hacia estructuras de planificación más explícitas
+- Soportar primero reglas declarativas
+- Soportar más adelante lógica opcional de proposals asistida por LLM
+- Nunca convertirse en la autoridad final de ejecución
 
-### Tool Registry
-- Mantiene el catálogo de tools  
-- Resuelve tools por nombre  
+### PolicyEngine
+
+- Pasar de comprobaciones name-based a control sensible a metadatos y payload
+- Imponer un `dry_run` con significado real
+- Preservar el comportamiento deny-by-default
+
+### ToolRegistry
+
+- Mantener el registry de producción distinto de registries de staging o de laboratorio
+- Reforzar contratos de registro y validación de metadatos
 
 ### Tools
-- Unidades de ejecución encapsuladas  
-- Objetivo:
-  - entrada/salida estructurada  
-  - comportamiento basado en metadatos  
 
-### Schemas
-- Definen contratos de entrada/salida  
-- Objetivo:
-  - validación estricta  
-  - estructuras de ejecución tipadas  
+- Contratos tipados de entrada/salida
+- Semántica clara de metadatos
+- Límites de ejecución más seguros
 
-### Core
-- Infraestructura compartida  
-- Objetivo:
-  - logging  
-  - configuración  
-  - contexto de ejecución  
+### Experimental Lab
 
----
+- Permanecer aislado del runtime de producción
+- Soportar generación de proposals, generación de skeletons, review en staging y auditabilidad
+- Nunca auto-promocionar a producción sin review explícita
 
-## Principios
+## Principios de diseño
 
-- Control explícito sobre la ejecución  
-- Sin efectos secundarios implícitos  
-- Separación de responsabilidades  
-- Contratos fuertes entre componentes  
-- Evolución incremental  
+- control explícito sobre la ejecución
+- sin desplazamientos ocultos de autoridad hacia modelos o artefactos generados
+- separación de responsabilidades
+- ruta de producción estable
+- ruta experimental aislada
+- trazabilidad antes que autonomía
 
----
+## Gap conocido entre estado actual y visión
 
-## Gaps conocidos respecto a la implementación actual
+El código actual ya contiene una primera ruta experimental de laboratorio, pero la arquitectura objetivo aún no está completa. En particular, lo siguiente sigue siendo futuro o parcial:
 
-- Los contratos entre componentes siguen siendo implícitos  
-- `dry_run` no está aplicado estructuralmente  
-- Las salidas de las tools no están estructuradas  
-- El runtime no gestiona errores de ejecución  
-- La policy se basa en una allowlist simple por nombre de tool  
-
----
-
-## Capacidades objetivo
-
-- ExecutionContext (trazabilidad y logging)  
-- Contratos estructurados de entrada/salida de tools  
-- Reglas de policy sensibles al payload  
-- Control de ejecución basado en riesgo  
-- Planificación multi-step  
-- Planificación asistida por LLM (opcional)  
-- Gestión de memoria/estado (fase posterior)  
+- execution plan tipado
+- validación estricta de planes en runtime
+- enforcement completo de dry-run
+- policy sensible al payload
+- trazabilidad completa de la ejecución de producción
+- planificación real soportada por LLM en condiciones controladas
+- workflow formal de promoción desde staging a producción

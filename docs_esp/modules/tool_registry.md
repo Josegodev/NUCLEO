@@ -1,38 +1,44 @@
+> Archivo origen: `docs/modules/tool_registry.md`
+> Última sincronización: `2026-04-19`
+
 # ToolRegistry
 
+## Capa
+
+Arquitectura verificada
+
 ## Propósito
-Registro central de tools disponibles en el sistema.
 
-## Comportamiento real
-`ToolRegistry` almacena instancias de tools en un diccionario interno indexado por `tool.name`.
+Resolver tools de producción por nombre desde el registry actual de producción en memoria.
 
-Comportamiento:
-- `register(tool)`: almacena la tool bajo su nombre  
-- `get(tool_name)`: devuelve la tool correspondiente o `None`  
-- `list_tools()`: devuelve todas las instancias de tools registradas  
+## Comportamiento actual verificado
 
-## Fortalezas
-- Búsqueda simple y eficiente basada en diccionario  
-- Separación clara de responsabilidades  
-- Complejidad adecuada para un sistema en fase bootstrap  
-- Fácil de entender y testear  
+`ToolRegistry` almacena instancias de tools en un diccionario indexado por `tool.name`.
 
-## Problemas detectados
-- Nombres de tools duplicados sobrescriben registros anteriores sin aviso  
-- No hay validación estricta del tipo de tool ni del nombre  
-- El contrato del nombre de la tool es implícito pero crítico  
-- `get()` delega el manejo de tools inexistentes a capas posteriores  
-- `list_tools()` expone instancias vivas de tools  
-- No hay soporte para introspección basada en metadatos  
-- No hay distinción entre mutación en bootstrap y en runtime  
+Operaciones soportadas:
 
-## Nivel de riesgo
-Medio
+- `register(tool)`
+- `get(tool_name)`
+- `list_tools()`
 
-## Mejoras recomendadas
-- Rechazar registros duplicados  
-- Validar el contrato de la tool en el momento del registro  
-- Tipar explícitamente el almacenamiento interno  
-- Documentar el comportamiento de `get()` cuando no existe la tool  
-- Añadir métodos auxiliares como `has()` o `list_tool_names()`  
-- Preparar el uso del registry para policy y documentación basadas en metadatos  
+## Distinción importante
+
+Este registry es el registry de producción. Está separado de:
+
+- `runtime_lab/`
+- staging registry
+- proposal store
+- skeletons de tools generadas
+
+Las tools del laboratorio no se auto-registran aquí.
+
+## Limitaciones actuales
+
+- los nombres duplicados sobrescriben silenciosamente
+- el contrato de tool no se valida de forma fuerte en el momento del registro
+- la mutación en runtime y la mutación en bootstrap no están claramente separadas
+
+## Etiqueta de estado
+
+- Registry de producción: implementado
+- Integración con staging / promoción: no implementada en el registry de producción
