@@ -60,7 +60,7 @@ class PolicyEngine:
                 reason="unauthenticated request",
             )
 
-        if tool_name not in {"echo", "system_info"}:
+        if tool_name not in {"echo", "system_info", "disk_info"}:
             return PolicyDecision(
                 decision="deny",
                 reason=f"tool '{tool_name}' is not allowed by policy",

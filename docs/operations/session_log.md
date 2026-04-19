@@ -112,3 +112,44 @@
 - Added:
   - `docs/audits/documentation_consistency_audit.md`
   - `docs/operations/session_log_docs_normalization.md`
+
+## 2026-04-19 - `disk_info` Tool Integration
+
+- Implemented:
+  - `app/tools/local/disk_info_tool.py`
+  - `DiskInfoTool`
+  - `name = "disk_info"`
+- Confirmed tool contract:
+  - read-only tool
+  - standard library only
+  - uses `shutil.disk_usage`
+  - cross-platform default path behavior:
+    - Windows → `C:\\`
+    - Linux/macOS → `/`
+- Corrected semantic naming from `memory_info` to `disk_info`.
+- Updated planner behavior to support:
+  - explicit `tool` + `payload`
+  - `disk_info` resolution from text input
+  - optional `path=...` extraction without overriding structured payload
+- Updated policy whitelist to allow `disk_info`.
+- Resolved runtime failure `Planner requested unknown tool: disk_info`.
+- Identified and fixed registry wiring issue:
+  - duplicated `ToolRegistry()` instances
+  - missing `DiskInfoTool()` registration
+  - centralized shared registry instance for runtime and API routes
+- Validated end-to-end flow:
+  - API → Planner → Policy → Registry → Tool → Response
+- Recorded successful real execution result for `path = C:\\`:
+  - `total_gb = 236.55`
+  - `used_gb = 228.43`
+  - `free_gb = 8.11`
+  - `free_percent = 3.43`
+  - `os = Windows`
+- Documented pending improvement:
+  - API response remains double-encapsulated
+  - `message` contains serialized JSON
+  - `result` contains the actual structured payload
+- Marked `disk_info` integration as functional.
+- Next steps:
+  - clean response layer
+  - add more local system-observation tools

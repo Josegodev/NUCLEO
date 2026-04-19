@@ -1,14 +1,8 @@
 from fastapi import APIRouter
 
-from app.tools.registry import ToolRegistry
-from app.tools.local.echo_tool import EchoTool
-from app.tools.local.system_info_tool import SystemInfoTool
+from app.tools.registry import registry
 
 router = APIRouter()
-
-registry = ToolRegistry()
-registry.register(EchoTool())
-registry.register(SystemInfoTool())
 
 
 @router.get("/tools")

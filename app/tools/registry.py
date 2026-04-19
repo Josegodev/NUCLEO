@@ -41,6 +41,9 @@ planner → policy → registry → tool
 """
 
 from app.tools.base import BaseTool
+from app.tools.local.disk_info_tool import DiskInfoTool
+from app.tools.local.echo_tool import EchoTool
+from app.tools.local.system_info_tool import SystemInfoTool
 
 
 class ToolRegistry:
@@ -55,3 +58,9 @@ class ToolRegistry:
 
     def list_tools(self) -> list[BaseTool]:
         return list(self._tools.values())
+
+
+registry = ToolRegistry()
+registry.register(EchoTool())
+registry.register(SystemInfoTool())
+registry.register(DiskInfoTool())

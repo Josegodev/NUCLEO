@@ -44,12 +44,30 @@ from app.schemas.tool_proposal import CapabilityGapSignal
 
 class Planner:
     def create_plan(self, request: AgentRequest) -> dict:
-        normalized_input = request.user_input.strip().lower()
+        structured_payload = request.payload or {}
+        raw_input = request.user_input or ""
+        normalized_input = raw_input.strip().lower()
+
+        if request.tool:
+            return {
+                "tool": request.tool,
+                "payload": structured_payload,
+            }
+
+        disk_path_from_text = self._extract_path_from_text(raw_input)
+        disk_payload = self._merge_disk_payload(structured_payload, disk_path_from_text)
+
+        if self._is_disk_info_request(normalized_input):
+            return {
+                "tool": "disk_info",
+                "payload": disk_payload,
+                "mode": "existing_tool",
+            }
 
         if "system" in normalized_input or "info" in normalized_input:
             return {
                 "tool": "system_info",
-                "payload": {},
+                "payload": structured_payload,
                 "mode": "existing_tool",
             }
 
@@ -65,16 +83,16 @@ class Planner:
             )
             return {
                 "tool": None,
-                "payload": {},
+                "payload": structured_payload,
                 "mode": gap.type,
-                "original_input": request.user_input,
+                "original_input": raw_input,
                 "capability_gap": gap.dict(),
             }
 
         return {
             "tool": "echo",
             "payload": {
-                "text": request.user_input
+                "text": raw_input
             },
             "mode": "existing_tool",
         }
@@ -99,3 +117,34 @@ class Planner:
         if not words:
             return "unclassified_capability"
         return "_".join(words[:4])
+
+    @staticmethod
+    def _is_disk_info_request(normalized_input: str) -> bool:
+        return "disk info" in normalized_input or "disk" in normalized_input
+
+    @staticmethod
+    def _extract_path_from_text(user_input: str) -> str | None:
+        marker = "path="
+        lower_input = user_input.lower()
+        marker_index = lower_input.find(marker)
+        if marker_index == -1:
+            return None
+
+        path_value = user_input[marker_index + len(marker):].strip()
+        if not path_value:
+            return None
+
+        for separator in (" ", ",", ";"):
+            separator_index = path_value.find(separator)
+            if separator_index != -1:
+                path_value = path_value[:separator_index]
+                break
+
+        return path_value.strip() or None
+
+    @staticmethod
+    def _merge_disk_payload(payload: dict, path_from_text: str | None) -> dict:
+        merged_payload = dict(payload)
+        if "path" not in merged_payload and path_from_text:
+            merged_payload["path"] = path_from_text
+        return merged_payload

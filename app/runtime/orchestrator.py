@@ -38,18 +38,12 @@ from app.schemas.context import ExecutionContext
 from app.schemas.requests import AgentRequest
 from app.schemas.responses import AgentResponse
 from app.runtime.planner import Planner
-from app.tools.registry import ToolRegistry
-from app.tools.local.echo_tool import EchoTool
-from app.tools.local.system_info_tool import SystemInfoTool
+from app.tools.registry import registry
 from app.policies.engine import PolicyEngine
 from app.services.audit.audit_store import AuditStore
 from app.services.staging.staging_registry import StagingRegistry
 from app.services.tool_generation.tool_generation_service import ToolGenerationService
 from app.services.tool_proposal.tool_proposal_service import ToolProposalService
-
-registry = ToolRegistry()
-registry.register(EchoTool())
-registry.register(SystemInfoTool())
 
 planner = Planner()
 policy_engine = PolicyEngine()
@@ -81,6 +75,9 @@ class AgentRuntime:
                 status="blocked",
                 message=policy_decision.reason,
             )
+
+        print("REGISTERED TOOLS:", registry.list_tools())
+        print("REQUESTED TOOL:", tool_name)
 
         tool = registry.get(tool_name)
         if not tool:
