@@ -29,9 +29,9 @@ Request
 
 ### Componentes verificados
 
-- `Planner` decide qué herramienta utilizar.
-- `PolicyEngine` valida la ejecución según autenticación, rol y nombre de tool.
-- `ToolRegistry` resuelve la herramienta por nombre.
+- `Planner` adapta intención a una acción candidata determinista.
+- `ToolRegistry` es la fuente de verdad de tools ejecutables.
+- `PolicyEngine` autoriza la ejecución según autenticación, rol y nombre de tool.
 - `Tool` ejecuta la acción real.
 - `AgentResponse` devuelve `status`, `message` y `result` opcional.
 
@@ -52,12 +52,16 @@ Request
 - Resultado estructurado conservado en `AgentResponse.result`
 - Fase HARDENING en curso:
   - contratos runtime-policy-registry más explícitos
+  - Planner devuelve `planned` o `no_plan`
+  - `no_plan` no ejecuta tools
   - `dry_run` no ejecuta la tool real
   - trazabilidad interna mínima en memoria para el runtime
 
 ### Experimental, no producción
 
-Existe una ruta experimental de laboratorio para propuestas y skeletons de tools asistidas por LLM. Está aislada en `runtime_lab/`, no auto-registra tools en producción y solo se activa mediante la señalización experimental del request.
+Existen módulos y artefactos de laboratorio aislados en `runtime_lab/`, pero no
+forman parte del contrato estable actual del Planner. El Planner estable solo
+devuelve `planned` o `no_plan`.
 
 ### No implementado todavía
 
@@ -133,7 +137,7 @@ curl -X POST http://127.0.0.1:8000/agent/run \
 }
 ```
 
-En `dry_run=true`, el runtime ejecuta Planner, PolicyEngine y ToolRegistry,
+En `dry_run=true`, el runtime ejecuta Planner, ToolRegistry y PolicyEngine,
 pero no llama a `Tool.run(...)`. La respuesta indica la tool que se habría
 ejecutado y marca `executed=false`.
 
@@ -149,9 +153,12 @@ AgentService
 ↓  
 AgentRuntime  
 ↓  
-Planner → PolicyEngine → ToolRegistry → Tool / dry_run  
+Planner → ToolRegistry → PolicyEngine → Tool / dry_run  
 ↓  
 AgentResponse
+
+Si el Planner devuelve `no_plan`, el Runtime no consulta PolicyEngine y no
+ejecuta ninguna tool. El Planner no autoriza y no ejecuta; solo propone.
 
 La trazabilidad de ejecución existe como mecanismo interno en memoria del
 runtime. No forma parte del contrato público de `/agent/run`, no se persiste y

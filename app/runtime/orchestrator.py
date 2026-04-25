@@ -14,15 +14,15 @@ Responsable de:
 Flujo:
 AgentRequest
     → Planner (create_plan)
-    → PolicyEngine (evaluate)
     → ToolRegistry (get tool)
+    → PolicyEngine (evaluate)
     → Tool (run)
     → AgentResponse
 
 Componentes:
-- Planner: decide qué acción ejecutar
+- Planner: propone una acción candidata determinista
+- ToolRegistry: mantiene catálogo de herramientas ejecutables
 - PolicyEngine: controla permisos y seguridad
-- ToolRegistry: mantiene catálogo de herramientas
 - Tools: implementaciones concretas de ejecución
 
 Notas:
@@ -35,23 +35,16 @@ Command Execution Pipeline con control de políticas.
 """
 
 from app.schemas.context import ExecutionContext
+from app.schemas.execution import PlannedAction
 from app.schemas.requests import AgentRequest
 from app.schemas.responses import AgentResponse
 from app.runtime.planner import Planner
 from app.runtime.tracing import ExecutionStep, ExecutionTrace, InMemoryTracer, Tracer
 from app.tools.registry import registry
 from app.policies.engine import PolicyEngine
-from app.services.audit.audit_store import AuditStore
-from app.services.staging.staging_registry import StagingRegistry
-from app.services.tool_generation.tool_generation_service import ToolGenerationService
-from app.services.tool_proposal.tool_proposal_service import ToolProposalService
 
 planner = Planner()
 policy_engine = PolicyEngine(tool_registry=registry)
-audit_store = AuditStore()
-proposal_service = ToolProposalService(audit_store=audit_store)
-staging_registry = StagingRegistry(audit_store=audit_store)
-tool_generation_service = ToolGenerationService(audit_store=audit_store)
 tracer = InMemoryTracer()
 
 
@@ -70,20 +63,57 @@ class AgentRuntime:
 
     def run(self, request: AgentRequest, context: ExecutionContext) -> AgentResponse:
         trace = self._safe_start_trace(context.request_id)
-        plan = self._planner.create_plan(request)
+        try:
+            plan = self._planner.create_plan(request)
+            self._validate_planner_result(plan)
+        except Exception as exc:
+            self._safe_record_step(
+                trace=trace,
+                phase="planner",
+                input={"user_input": request.user_input},
+                output={},
+                status="error",
+                error=str(exc),
+            )
+            return AgentResponse(
+                status="error",
+                message=f"Planner failed to produce a valid result: {exc}",
+            )
+
         self._safe_record_step(
             trace=trace,
             phase="planner",
             input={"user_input": request.user_input},
-            output=plan,
+            output=plan.model_dump(),
             status="success",
         )
 
-        if plan.get("mode") == "capability_gap_detected":
-            return self._handle_capability_gap(plan=plan, context=context)
+        if plan.status == "no_plan":
+            return AgentResponse(
+                status="no_plan",
+                message=plan.reason,
+            )
 
-        tool_name = plan["tool"]
-        tool_payload = plan["payload"]
+        tool_name = plan.tool_name
+        tool_payload = plan.payload
+
+        tool = self._registry.get(tool_name)
+        self._safe_record_step(
+            trace=trace,
+            phase="registry",
+            input={"tool": tool_name},
+            output={
+                "found": tool is not None,
+                "tool": getattr(tool, "name", None),
+            },
+            status="success" if tool else "error",
+            error=None if tool else f"Planner proposed unknown tool: {tool_name}",
+        )
+        if not tool:
+            return AgentResponse(
+                status="error",
+                message=f"Planner proposed unknown tool: {tool_name}",
+            )
 
         policy_decision = self._policy_engine.evaluate(
             tool_name=tool_name,
@@ -114,25 +144,6 @@ class AgentRuntime:
             return AgentResponse(
                 status="blocked",
                 message=policy_decision.reason,
-            )
-
-        tool = self._registry.get(tool_name)
-        self._safe_record_step(
-            trace=trace,
-            phase="registry",
-            input={"tool": tool_name},
-            output={
-                "found": tool is not None,
-                "tool": getattr(tool, "name", None),
-            },
-            status="success" if tool else "error",
-            error=None if tool else f"Planner requested unknown tool: {tool_name}",
-        )
-        if not tool:
-            message = f"Planner requested unknown tool: {tool_name}"
-            return AgentResponse(
-                status="error",
-                message=message,
             )
 
         if request.dry_run:
@@ -182,6 +193,10 @@ class AgentRuntime:
             result=result,
         )
 
+    def _validate_planner_result(self, plan: PlannedAction) -> None:
+        if not isinstance(plan, PlannedAction):
+            raise TypeError("Planner must return PlannedAction")
+
     def _safe_start_trace(self, request_id: str | None) -> ExecutionTrace | None:
         try:
             return self._tracer.start_trace(request_id=request_id)
@@ -216,46 +231,3 @@ class AgentRuntime:
             )
         except Exception:
             return
-
-    def _handle_capability_gap(
-        self,
-        plan: dict,
-        context: ExecutionContext,
-    ) -> AgentResponse:
-        gap = plan["capability_gap"]
-        proposal = proposal_service.create_from_gap(
-            user_input=plan.get("original_input", gap["capability_name"]),
-            capability_name=gap["capability_name"],
-            context=context,
-        )
-        proposal_path = f"runtime_lab/proposals/{proposal.proposal_id}.json"
-        staging_registry.register_proposal(proposal, proposal_path=proposal_path)
-        generated_artifacts = tool_generation_service.generate_from_proposal(proposal)
-        staging_registry.update_status(
-            proposal_id=proposal.proposal_id,
-            status="generated",
-            generated_path=generated_artifacts["tool_dir"],
-        )
-        audit_store.record(
-            event="capability_gap_handled",
-            proposal_id=proposal.proposal_id,
-            action="planner_gap_to_staging",
-            result="success",
-            artifact_paths=[proposal_path, generated_artifacts["tool_dir"]],
-            metadata={
-                "capability_name": gap["capability_name"],
-                "requested_by": context.username,
-            },
-        )
-        return AgentResponse(
-            status="capability_gap",
-            message=gap["reason"],
-            result={
-                "capability_gap_detected": True,
-                "proposal_id": proposal.proposal_id,
-                "proposal_path": proposal_path,
-                "generated_artifacts": generated_artifacts,
-                "staging_status": "generated",
-                "production_registry_unchanged": True,
-            },
-        )

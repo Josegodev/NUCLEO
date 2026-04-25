@@ -29,7 +29,7 @@ PolicyDecision:
 
 Notas:
 - No ejecuta acciones, solo valida
-- Se evalúa antes de acceder al registry o ejecutar tools
+- Runtime valida primero que la tool existe en ToolRegistry
 - Diseñado para ser extensible (reglas más complejas en el futuro)
 
 Limitaciones actuales:
@@ -39,7 +39,7 @@ Limitaciones actuales:
 
 Arquitectura:
 Capa de control dentro del pipeline:
-planner → policy → execution
+planner → registry → policy → execution
 """
 
 from app.policies.models import PolicyDecision

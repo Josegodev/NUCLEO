@@ -180,3 +180,9 @@
   the intended tool step as `skipped`.
 - Added unittest coverage for allowed, denied, dry-run, unknown-tool, tool-error,
   tracer-failure, and API response-contract behavior.
+- Hardened planner contract:
+  - added typed `PlannedAction`
+  - reduced planner statuses to `planned` and `no_plan`
+  - made `no_plan` a valid non-executing result
+  - made runtime stop before policy when planner output is invalid
+  - made runtime validate `ToolRegistry` before policy authorization

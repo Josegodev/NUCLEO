@@ -6,48 +6,55 @@ Verified architecture
 
 ## Purpose
 
-Transform an `AgentRequest` into a runtime plan or, in the experimental opt-in path, emit a structured capability-gap signal.
+Transform an `AgentRequest` into a deterministic candidate action.
+
+The planner proposes. It does not authorize, resolve runtime truth, or execute.
 
 ## Verified Current Behavior
 
 The planner currently:
 
 1. normalizes `request.user_input` with `strip().lower()`
-2. if input contains `system` or `info`, returns a production plan for `system_info`
-3. if `experimental_tool_generation=True` and a simple heuristic suggests a missing capability, returns `capability_gap_detected`
-4. otherwise returns a production fallback plan for `echo`
+2. if `request.tool` is set and the tool exists in `ToolRegistry`, returns `planned`
+3. evaluates a small explicit table of deterministic rules
+4. if a rule matches and its tool exists in `ToolRegistry`, returns `planned`
+5. otherwise returns `no_plan`
 
 ## Contract Observed in Code
 
-Current output remains an implicit `dict`.
+Current output is `PlannedAction`.
 
-Observed keys:
+Fields:
 
-- `tool`
+- `status`
+- `tool_name`
 - `payload`
-- `mode`
+- `confidence`
+- `reason`
+- `source`
 
-Experimental gap path may add:
+Statuses:
 
-- `original_input`
-- `capability_gap`
+- `planned`
+- `no_plan`
+
+`no_plan` is expected when no deterministic rule matches.
 
 ## Strengths
 
 - Deterministic
 - Side-effect free in production path
 - Easy to read
-- Experimental branching is explicit and opt-in
+- Rules are table-driven and auditable
+- Planner checks rule targets against `ToolRegistry`
+- Runtime receives a typed contract instead of an implicit dict
 
 ## Current Limitations
 
-- Output contract is not typed in production runtime
 - Matching logic is weak and heuristic-based
-- Capability-gap detection is intentionally simplistic
 - Strong coupling to literal production tool names remains
 
 ## Status Label
 
 - Production planning: implemented
-- Capability-gap signaling: experimental
 - Real LLM-assisted planning: not implemented

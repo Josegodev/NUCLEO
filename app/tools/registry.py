@@ -37,7 +37,7 @@ Limitaciones actuales:
 
 Arquitectura:
 Patrón Service Locator dentro del pipeline:
-planner → policy → registry → tool
+planner → registry → policy → tool
 """
 
 from app.tools.base import BaseTool

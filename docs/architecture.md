@@ -57,8 +57,8 @@ execution. This trace is not part of the public API response contract.
 
 - Coordinates the runtime pipeline
 - Calls planner
-- Calls policy engine
 - Resolves tools through production registry
+- Calls policy engine
 - Executes production tools
 - Records internal planner, policy, and tool steps through the runtime tracer
 - Returns `AgentResponse`
@@ -66,10 +66,12 @@ execution. This trace is not part of the public API response contract.
 ### Planner
 
 - Performs simple rule-based planning
-- Returns an implicit `dict`
+- Acts as a deterministic intent-to-candidate-action adapter
+- Returns a typed `PlannedAction`
+- Does not authorize or execute tools
 - Can emit either:
-  - a production tool plan
-  - an experimental `capability_gap_detected` signal when explicitly requested
+  - `planned`
+  - `no_plan`
 
 ### PolicyEngine
 
@@ -114,18 +116,24 @@ Current fields:
 
 ### Planner Output
 
-The planner still returns an implicit `dict`. The contract is not yet strongly typed in the stable runtime.
+The planner returns `PlannedAction`.
 
-Observed keys:
+Current fields:
 
-- `tool`
+- `status`
+- `tool_name`
 - `payload`
-- `mode`
+- `confidence`
+- `reason`
+- `source`
 
-When experimental gap detection is triggered, additional keys may appear:
+`status` can be:
 
-- `original_input`
-- `capability_gap`
+- `planned`
+- `no_plan`
+
+`no_plan` is a valid result. It means no deterministic rule matched, so runtime
+must not execute any tool.
 
 ### PolicyDecision
 
@@ -159,24 +167,16 @@ external integration.
 
 ## Verified Experimental Subsystem
 
-An experimental subsystem for controlled tool proposal and skeleton generation is implemented in isolated modules and `runtime_lab/`.
+Experimental proposal and staging modules still exist in isolated code and
+`runtime_lab/`, but they are not part of the current stable Planner contract.
 
-### Experimental flow
+The current Planner returns only:
 
-This path is opt-in and does not change the production registry:
+- `planned`
+- `no_plan`
 
-AgentRequest with `experimental_tool_generation=True`  
-→ Planner may emit `capability_gap_detected`  
-→ AgentRuntime handles the gap  
-→ ToolProposalService creates a structured proposal  
-→ StagingRegistry stores isolated staging state  
-→ ToolGenerationService creates a lab-only skeleton  
-→ AuditStore records lab events  
-→ AgentResponse returns a controlled capability-gap result
-
-### Important architectural rule
-
-Experimental generated tools are not auto-registered in the production `ToolRegistry`.
+Experimental generated tools are not auto-registered in the production
+`ToolRegistry`.
 
 ## Verified Constraints and Limitations
 
