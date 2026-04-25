@@ -48,7 +48,12 @@ Request
 - Tools de producción:
   - `echo`
   - `system_info`
+  - `disk_info`
 - Resultado estructurado conservado en `AgentResponse.result`
+- Fase HARDENING en curso:
+  - contratos runtime-policy-registry más explícitos
+  - `dry_run` no ejecuta la tool real
+  - trazabilidad interna mínima en memoria para el runtime
 
 ### Experimental, no producción
 
@@ -60,7 +65,8 @@ Existe una ruta experimental de laboratorio para propuestas y skeletons de tools
 - Promoción automática desde staging a producción
 - Ejecución de tools generadas en el registry principal
 - Persistencia operativa del runtime más allá de artefactos de laboratorio
-- Trazabilidad completa de producción integrada en el pipeline estable
+- Exposición pública de trazas por API
+- Persistencia de trazas fuera de memoria
 
 ## Quick start:
 
@@ -90,9 +96,7 @@ El sistema utiliza API key por request mediante `Authorization: Bearer <token>`.
 
 Clave de desarrollo disponible en la configuración actual:
 
-```text
-dev-jose-key
-```
+
 
 ## Ejemplo de uso
 
@@ -101,7 +105,7 @@ dev-jose-key
 ```json
 {
   "user_input": "system info",
-  "dry_run": false
+  "dry_run": true
 }
 ```
 
@@ -111,22 +115,27 @@ dev-jose-key
 curl -X POST http://127.0.0.1:8000/agent/run \
   -H "Authorization: Bearer dev-jose-key" \
   -H "Content-Type: application/json" \
-  -d "{\"user_input\": \"system info\", \"dry_run\": false}"
+  -d "{\"user_input\": \"system info\", \"dry_run\": true}"
 ```
 
 ### Response actual
 
 ```json
 {
-  "status": "success",
-  "message": "{'requested_by': 'jose', 'request_id': '...', 'os': 'Windows', ...}",
+  "status": "dry_run_success",
+  "message": "{'dry_run': True, 'executed': False, 'tool': 'system_info', 'payload': {}}",
   "result": {
-    "requested_by": "jose",
-    "request_id": "...",
-    "os": "Windows"
+    "dry_run": true,
+    "executed": false,
+    "tool": "system_info",
+    "payload": {}
   }
 }
 ```
+
+En `dry_run=true`, el runtime ejecuta Planner, PolicyEngine y ToolRegistry,
+pero no llama a `Tool.run(...)`. La respuesta indica la tool que se habría
+ejecutado y marca `executed=false`.
 
 ## Flujo de ejecución
 
@@ -140,9 +149,13 @@ AgentService
 ↓  
 AgentRuntime  
 ↓  
-Planner → Policy → ToolRegistry → Tool  
+Planner → PolicyEngine → ToolRegistry → Tool / dry_run  
 ↓  
 AgentResponse
+
+La trazabilidad de ejecución existe como mecanismo interno en memoria del
+runtime. No forma parte del contrato público de `/agent/run`, no se persiste y
+no se expone todavía mediante endpoint.
 
 ## Referencias útiles
 
