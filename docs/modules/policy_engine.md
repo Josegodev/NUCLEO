@@ -14,6 +14,7 @@ Validate whether a planned production tool execution is allowed before reaching 
 
 - denies unauthenticated requests
 - allows `echo`
+- allows `disk_info`
 - allows `system_info` only when `admin` is present in roles
 - denies any other tool name
 
@@ -25,7 +26,7 @@ It returns a `PolicyDecision` with:
 ## What It Does Not Currently Do
 
 - it does not deeply evaluate payload
-- it does not enforce meaningful `dry_run`
+- it does not make different decisions for `dry_run`; runtime enforces non-execution
 - it does not use `read_only` or `risk_level`
 - it does not govern lab artifact generation directly
 

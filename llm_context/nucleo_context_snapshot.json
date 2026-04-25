@@ -1,0 +1,101 @@
+{
+  "project": "NUCLEO",
+  "phase": "HARDENING",
+  "generated_at": "2026-04-25T17:14:44+00:00",
+  "architecture_flow": [
+    "API",
+    "AgentService",
+    "AgentRuntime",
+    "Planner",
+    "PolicyEngine",
+    "ToolRegistry",
+    "Tool"
+  ],
+  "allowed_llm_role": "external_observer_only",
+  "forbidden_actions": [
+    "execute_tools",
+    "modify_runtime",
+    "bypass_policy",
+    "call_agent_api"
+  ],
+  "open_hardening_topics": [
+    "closed policy decisions",
+    "dry_run determinism",
+    "structured AgentResponse",
+    "policy/registry consistency",
+    "error handling",
+    "observability"
+  ],
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 5325,
+      "sha256": "fe87c06511e62cf856a4d808a023a3f4b89eb0c2ecc5b713e993b2d724293f69"
+    },
+    {
+      "path": "docs/architecture.md",
+      "bytes": 5789,
+      "sha256": "b721e98907eb9c0c994f59888ab14a4ef9e725f0d200d2065eb11a01819f7319"
+    },
+    {
+      "path": "docs/operations/operational_state.md",
+      "bytes": 4424,
+      "sha256": "a4c658760e5052ffee9e2fc8e3cf71fd8f0f7bf2865dddd7100700d488c68202"
+    },
+    {
+      "path": "docs/operations/session_log.md",
+      "bytes": 5576,
+      "sha256": "a5779fb88641ffedf9da9a4ae5bf0687505cfaecdac4c757674ad3e45e382efd"
+    },
+    {
+      "path": "docs/modules/agent_service.md",
+      "bytes": 750,
+      "sha256": "c7e7b03b256e8fa270e93721c124ed4a37028dc07c18ede9989a70712806fb03"
+    },
+    {
+      "path": "docs/modules/audit_store.md",
+      "bytes": 420,
+      "sha256": "c66f5fe73a6c99ddaa14fb8ca3ddc1760fd0d44bd57f1104a3192ae8675dd542"
+    },
+    {
+      "path": "docs/modules/base_tool.md",
+      "bytes": 646,
+      "sha256": "691a546cb9aa28214a0aacdae00e20b7ec1b39a56aaa45a70e1cb2826ff8842d"
+    },
+    {
+      "path": "docs/modules/orchestrator.md",
+      "bytes": 2011,
+      "sha256": "9c65f9b6f8425526c1e855fcada4a92a6bb40810b6758f105566be05053c2b37"
+    },
+    {
+      "path": "docs/modules/planner.md",
+      "bytes": 1283,
+      "sha256": "d0dd522d5cecdc434f743b3b7082fee07480753171dc44a686e71abfc1aa8dd6"
+    },
+    {
+      "path": "docs/modules/policy_engine.md",
+      "bytes": 977,
+      "sha256": "0f5b68468be1057860f4c76f7e6b98da107483688f401d85f703e57fb707187d"
+    },
+    {
+      "path": "docs/modules/staging_registry.md",
+      "bytes": 440,
+      "sha256": "16ded85cfc81795eb96827b6639154c91bb9ccd0b530a01a7e2470c581504dbc"
+    },
+    {
+      "path": "docs/modules/tool_generation_service.md",
+      "bytes": 434,
+      "sha256": "82fdafb585748b8ba029bca3cd4e31153e214014758e8d41c2459d35f8a91778"
+    },
+    {
+      "path": "docs/modules/tool_proposal_service.md",
+      "bytes": 675,
+      "sha256": "4ec5f129c77c3abaa0f50b7a8569c96930fec649f05052d0d36194efb39e1e9c"
+    },
+    {
+      "path": "docs/modules/tool_registry.md",
+      "bytes": 874,
+      "sha256": "8f43370c32cf6c37fa90ca4c50a7aafc43ab44e64307a49625f9897bf1508d35"
+    }
+  ]
+}

@@ -18,16 +18,16 @@ Central execution orchestrator of the production runtime.
 4. validates that the planner returned `PlannedAction`
 5. if the plan is `no_plan`, returns a controlled `no_plan` response
 6. otherwise extracts candidate `tool_name` and `payload`
-7. resolves the tool from production `ToolRegistry`
-8. records the registry step
-9. if missing, records the registry step as `error` and returns `error`
-10. asks `PolicyEngine` for authorization
-11. records the policy step
-12. if denied, returns `blocked`
-14. if `dry_run=True`, records a tool step as `skipped` with `executed=False` and does not run the tool
-15. otherwise executes `tool.run(payload, context=context)`
-16. records success or error for the tool step
-17. returns `AgentResponse`
+7. asks `PolicyEngine` for authorization
+8. records the policy step
+9. if denied, returns `blocked`
+10. resolves the tool from production `ToolRegistry`
+11. records the registry step
+12. if missing, records the registry step as `error` and returns `error`
+13. if `dry_run=True`, records a tool step as `skipped` with `executed=False` and does not run the tool
+14. otherwise executes `tool.run(payload, context=context)`
+15. records success or error for the tool step
+16. returns `AgentResponse`
 
 ## Internal Trace Contract
 

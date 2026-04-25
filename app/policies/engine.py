@@ -29,7 +29,7 @@ PolicyDecision:
 
 Notas:
 - No ejecuta acciones, solo valida
-- Runtime valida primero que la tool existe en ToolRegistry
+- Runtime resuelve la instancia de tool después de una decisión allow
 - Diseñado para ser extensible (reglas más complejas en el futuro)
 
 Limitaciones actuales:
@@ -39,7 +39,7 @@ Limitaciones actuales:
 
 Arquitectura:
 Capa de control dentro del pipeline:
-planner → registry → policy → execution
+planner → policy → registry → execution
 """
 
 from app.policies.models import PolicyDecision
@@ -49,6 +49,8 @@ from app.tools.registry import registry as default_registry
 
 
 class PolicyEngine:
+    ALLOWED_TOOL_NAMES = {"echo", "disk_info", "system_info"}
+
     def __init__(self, tool_registry: ToolRegistry = default_registry) -> None:
         self._tool_registry = tool_registry
 
@@ -65,7 +67,7 @@ class PolicyEngine:
                 reason="unauthenticated request",
             )
 
-        if self._tool_registry.get(tool_name) is None:
+        if tool_name not in self.ALLOWED_TOOL_NAMES:
             return PolicyDecision(
                 decision="deny",
                 reason=f"tool '{tool_name}' is not allowed by policy",

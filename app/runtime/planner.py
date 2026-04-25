@@ -37,9 +37,9 @@ Limitaciones actuales:
 - No soporta múltiples acciones ni composición de tools
 - No utiliza contexto ni memoria
 
-Arquitectura:
-Componente de decisión dentro del pipeline:
-input → planner → registry → policy → execution
+	Arquitectura:
+	Componente de decisión dentro del pipeline:
+	input → planner → policy → registry → execution
 """
 
 from dataclasses import dataclass

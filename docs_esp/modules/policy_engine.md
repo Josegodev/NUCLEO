@@ -1,5 +1,5 @@
 > Archivo origen: `docs/modules/policy_engine.md`
-> Última sincronización: `2026-04-19`
+> Última sincronización: `2026-04-25`
 
 # PolicyEngine
 
@@ -17,6 +17,7 @@ Validar si una ejecución planificada de una tool de producción está permitida
 
 - deniega requests no autenticadas
 - permite `echo`
+- permite `disk_info`
 - permite `system_info` solo cuando `admin` está presente en los roles
 - deniega cualquier otro nombre de tool
 
@@ -28,7 +29,7 @@ Devuelve una `PolicyDecision` con:
 ## Lo que actualmente no hace
 
 - no evalúa el payload en profundidad
-- no impone un `dry_run` con significado real
+- no toma decisiones diferentes por `dry_run`; el runtime impone la no ejecución
 - no usa `read_only` ni `risk_level`
 - no gobierna directamente la generación de artefactos del laboratorio
 

@@ -1,5 +1,5 @@
 > Archivo origen: `docs/architecture.md`
-> Última sincronización: `2026-04-19`
+> Última sincronización: `2026-04-25`
 
 # Arquitectura - Estado actual verificado
 
@@ -60,20 +60,24 @@ AgentRequest
 - Invoca al policy engine
 - Resuelve tools a través del registry de producción
 - Ejecuta tools de producción
+- Registra pasos internos de planner, policy, registry y tool mediante el tracer del runtime
 - Devuelve `AgentResponse`
 
 ### Planner
 
 - Realiza planificación simple basada en reglas
-- Devuelve un `dict` implícito
+- Actúa como adaptador determinista de intención a acción candidata
+- Devuelve un `PlannedAction` tipado
+- No autoriza ni ejecuta tools
 - Puede emitir:
-  - un plan de tool de producción
-  - una señal experimental `capability_gap_detected` cuando se solicita explícitamente
+  - `planned`
+  - `no_plan`
 
 ### PolicyEngine
 
 - Requiere un `ExecutionContext` autenticado
 - Permite `echo`
+- Permite `disk_info`
 - Permite `system_info` solo para `admin`
 - Deniega cualquier otra tool de producción por nombre
 
@@ -83,12 +87,34 @@ AgentRequest
 - Resuelve tools por `tool.name`
 - Está separado de staging y de los registries experimentales
 
+### LLM Lab / Ruta lateral experimental
+
+`runtime_lab/llm_lab/` existe dentro del repositorio, pero no forma parte del
+flujo estable de ejecución.
+
+Puede:
+
+- cargar contexto documentado del repositorio para revisión externa
+- ejecutar chats locales de Mistral/Qwen mediante Ollama
+- persistir memoria local de chat en SQLite bajo `runtime_lab/llm_lab/`
+- generar informes markdown de revisión HARDENING bajo
+  `runtime_lab/llm_lab/reports/`
+
+No debe:
+
+- llamar automáticamente a `AgentService` ni a `/agent/run`
+- actuar como Planner
+- ejecutar tools de producción
+- modificar `PolicyEngine`
+- registrar tools en el `ToolRegistry` de producción
+
 ### Tools de producción
 
 Actualmente registradas en tiempo de importación en el runtime de producción:
 
 - `echo`
 - `system_info`
+- `disk_info`
 
 ### AgentResponse
 
@@ -107,23 +133,30 @@ El modelo de respuesta actual del runtime contiene:
 Campos actuales:
 
 - `user_input: str`
+- `tool: str | None`
+- `payload: dict | None`
 - `dry_run: bool = True`
 - `experimental_tool_generation: bool = False`
 
 ### Salida del Planner
 
-El planner sigue devolviendo un `dict` implícito. El contrato aún no está tipado de forma fuerte en el runtime estable.
+El planner devuelve `PlannedAction`.
 
-Claves observadas:
+Campos actuales:
 
-- `tool`
+- `status`
+- `tool_name`
 - `payload`
-- `mode`
+- `confidence`
+- `reason`
+- `source`
 
-Cuando se activa la detección experimental de gaps, pueden aparecer claves adicionales:
+`status` puede ser:
 
-- `original_input`
-- `capability_gap`
+- `planned`
+- `no_plan`
+
+`no_plan` es un resultado válido. Significa que ninguna regla determinista ha encajado, por lo que el runtime no debe ejecutar ninguna tool.
 
 ### PolicyDecision
 
@@ -132,22 +165,40 @@ Campos actuales:
 - `decision`
 - `reason`
 
+### Traza del runtime
+
+La trazabilidad interna está implementada en `app/runtime/tracing.py`.
+
+`ExecutionTrace` contiene:
+
+- `trace_id`
+- `request_id`
+- `steps`
+
+Cada `ExecutionStep` contiene:
+
+- `step_id`
+- `phase` (`planner`, `policy`, `registry` o `tool`)
+- `input`
+- `output`
+- `status` (`success`, `denied`, `error` o `skipped`)
+- `error`
+- `timestamp`
+
+La implementación actual es `InMemoryTracer`. No tiene persistencia en disco ni
+integración externa.
+
 ## Subsistema experimental verificado
 
-Existe un subsistema experimental para propuesta controlada de tools y generación de skeletons, implementado en módulos aislados y en `runtime_lab/`.
+Los módulos experimentales de proposal y staging siguen existiendo en código aislado y en `runtime_lab/`, pero no forman parte del contrato estable actual del Planner.
 
-### Flujo experimental
+El Planner actual solo devuelve:
 
-Esta ruta es opt-in y no modifica el registry de producción:
+- `planned`
+- `no_plan`
 
-AgentRequest con `experimental_tool_generation=True`  
--> Planner puede emitir `capability_gap_detected`  
--> AgentRuntime gestiona el gap  
--> ToolProposalService crea una proposal estructurada  
--> StagingRegistry guarda el estado aislado de staging  
--> ToolGenerationService crea un skeleton solo de laboratorio  
--> AuditStore registra eventos del laboratorio  
--> AgentResponse devuelve un resultado controlado de `capability_gap`
+El campo `experimental_tool_generation` existe en `AgentRequest`, pero el
+runtime estable actual no lo usa para derivar a una ruta de capability gap.
 
 ### Regla arquitectónica importante
 
@@ -155,8 +206,8 @@ Las tools experimentales generadas no se auto-registran en el `ToolRegistry` de 
 
 ## Restricciones y limitaciones verificadas
 
-- La salida del planner sigue siendo implícita y no está validada en runtime
-- `dry_run` sigue propagándose, pero no está impuesto de forma estructural para la ejecución de tools de producción
+- La salida del planner está tipada como `PlannedAction` y validada por el runtime
+- `dry_run` está impuesto de forma estructural por el runtime: se evalúa policy, se registra el paso de tool y no se ejecuta la tool de producción
 - La policy sigue siendo en gran parte name-based
 - Metadatos de tools como `read_only` y `risk_level` aún no se aplican desde policy
 - El bootstrap de producción sigue ocurriendo en tiempo de importación en `orchestrator.py`
@@ -167,6 +218,7 @@ Las tools experimentales generadas no se auto-registran en el `ToolRegistry` de 
 Lo siguiente no debe describirse como comportamiento implementado en producción:
 
 - Planificación real soportada por LLM
+- Participación de Mistral/Qwen en el runtime de producción
 - Autoextensión del registry de producción
 - Instalación dinámica de paquetes
 - Ejecución arbitraria de shell

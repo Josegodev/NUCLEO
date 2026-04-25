@@ -17,6 +17,7 @@ The repository currently provides:
 - Production tools:
   - `echo`
   - `system_info`
+  - `disk_info`
 - `ExecutionContext` propagated across API, runtime, policy, and tools
 - `AgentResponse` with `status`, `message`, and optional `result`
 
@@ -24,25 +25,28 @@ The repository currently provides:
 
 The repository also contains an isolated experimental lab subsystem:
 
-- capability-gap signal from planner when explicitly requested
 - deterministic proposal generation placeholder
 - isolated staging registry
 - lab-only skeleton generation
 - audit artifact generation
+- `runtime_lab/llm_lab/` as a lateral local observation path for Mistral/Qwen
+  chats and HARDENING reports
 
 This subsystem is implemented but not part of the stable production registry path.
+Mistral/Qwen are not part of AgentService, Runtime, Planner, PolicyEngine,
+ToolRegistry, or Tools.
 
 ## Main Remaining Weaknesses
 
 ### 1. Weak internal contracts
 
-- planner output is still implicit
+- planner output is typed as `PlannedAction`
 - tool payload contracts are still implicit
 - tool output is not yet standardized beyond current response container
 
 ### 2. Incomplete execution control
 
-- `dry_run` is still not structurally enforced for production execution
+- `dry_run` is structurally enforced for production execution
 - policy does not evaluate payload deeply
 - `read_only` and `risk_level` metadata are still not policy-enforced
 
@@ -53,7 +57,7 @@ This subsystem is implemented but not part of the stable production registry pat
 
 ### 4. Bootstrap coupling
 
-- planner, policy engine, registry, and experimental services are still composed at module import time
+- planner, policy engine, and registry are still composed at module import time
 
 ### 5. Documentation and operational drift risk
 
@@ -64,14 +68,14 @@ This subsystem is implemented but not part of the stable production registry pat
 
 ### Priority 1 - Reinforce contracts
 
-- introduce typed execution plan
+- keep hardening the typed execution plan contract
 - define structured tool payload contracts
 - define stronger tool result contracts
 - strengthen `BaseTool` contract
 
 ### Priority 2 - Enforce execution control
 
-- make `dry_run` meaningful
+- keep `dry_run` deterministic and covered by tests
 - use tool metadata in policy decisions
 - prepare payload-aware policy checks
 
@@ -92,6 +96,8 @@ This subsystem is implemented but not part of the stable production registry pat
 - richer artifact metadata
 - explicit promotion process
 - real LLM integration only behind controlled boundaries
+- keep `llm_lab` as observation-only unless a future explicit design changes
+  that boundary
 
 ## Not Yet Recommended
 

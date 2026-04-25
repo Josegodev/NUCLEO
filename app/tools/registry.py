@@ -35,9 +35,9 @@ Limitaciones actuales:
 - No valida tipos estrictamente
 - No incluye metadata adicional de tools
 
-Arquitectura:
-Patrón Service Locator dentro del pipeline:
-planner → registry → policy → tool
+	Arquitectura:
+	Patrón Service Locator dentro del pipeline:
+	planner → policy → registry → tool
 """
 
 from app.tools.base import BaseTool

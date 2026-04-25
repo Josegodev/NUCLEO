@@ -1,5 +1,5 @@
 > Archivo origen: `docs/modules/orchestrator.md`
-> Última sincronización: `2026-04-19`
+> Última sincronización: `2026-04-25`
 
 # AgentRuntime
 
@@ -9,51 +9,43 @@ Arquitectura verificada
 
 ## Propósito
 
-Orquestador central de ejecución del runtime de producción, con una rama aislada mínima para el manejo experimental de capability gaps.
+Orquestador central de ejecución del runtime de producción.
 
 ## Comportamiento actual verificado
 
 `AgentRuntime.run(request, context)` actualmente:
 
-1. pide un plan al planner
-2. si el plan señala `capability_gap_detected`, deriva a la ruta aislada del laboratorio
-3. en caso contrario extrae `tool` y `payload` de producción
-4. pide autorización al `PolicyEngine`
-5. si la policy deniega, devuelve `blocked`
-6. resuelve la tool desde el `ToolRegistry` de producción
-7. si falta, devuelve `error`
-8. ejecuta `tool.run(payload, context=context)`
-9. devuelve `AgentResponse`
-
-## Rama experimental verificada
-
-El runtime compone actualmente servicios de laboratorio en tiempo de importación del módulo y, para requests opt-in, puede:
-
-- crear una proposal
-- registrarla en staging
-- generar un skeleton de tool
-- escribir eventos de audit
-- devolver una respuesta controlada de `capability_gap`
-
-Esto no registra la tool en el registry de producción.
+1. inicia una traza interna en memoria
+2. pide al planner un `PlannedAction`
+3. registra el paso del planner
+4. valida que el planner devolvió `PlannedAction`
+5. si el plan es `no_plan`, devuelve una respuesta controlada `no_plan`
+6. si no, extrae `tool_name` y `payload`
+7. pide autorización al `PolicyEngine`
+8. registra el paso de policy
+9. si la policy deniega, devuelve `blocked`
+10. resuelve la tool desde el `ToolRegistry` de producción
+11. registra el paso del registry
+12. si falta, registra el paso como `error` y devuelve `error`
+13. si `dry_run=True`, registra un paso de tool como `skipped` con `executed=False` y no ejecuta la tool
+14. si no, ejecuta `tool.run(payload, context=context)`
+15. registra success o error para el paso de tool
+16. devuelve `AgentResponse`
 
 ## Fortalezas actuales
 
 - pipeline de producción claro
 - comprobación explícita de policy antes de ejecutar una tool de producción
 - manejo explícito de tool de producción ausente
-- la rama experimental permanece aislada del registry de producción
+- traza interna mínima para fases de planner, policy, registry y tool
 
 ## Limitaciones actuales
 
-- el contrato del planner sigue siendo implícito
 - la composición del runtime sigue ocurriendo en tiempo de importación
 - el manejo de excepciones es limitado
-- `dry_run` aún no se impone de forma estructural para tools de producción
 - la respuesta sigue duplicando datos entre `message` y `result`
 
 ## Etiqueta de estado
 
 - Ruta de producción: implementada
-- Ruta de manejo de gaps en laboratorio: experimental
 - Endurecimiento completo de contratos: no implementado

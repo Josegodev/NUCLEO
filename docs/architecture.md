@@ -57,8 +57,8 @@ execution. This trace is not part of the public API response contract.
 
 - Coordinates the runtime pipeline
 - Calls planner
-- Resolves tools through production registry
 - Calls policy engine
+- Resolves tools through production registry
 - Executes production tools
 - Records internal planner, policy, and tool steps through the runtime tracer
 - Returns `AgentResponse`
@@ -77,6 +77,7 @@ execution. This trace is not part of the public API response contract.
 
 - Requires authenticated execution context
 - Allows `echo`
+- Allows `disk_info`
 - Allows `system_info` only for `admin`
 - Denies all other production tools by name
 
@@ -85,6 +86,27 @@ execution. This trace is not part of the public API response contract.
 - Stores production tool instances in a dictionary
 - Resolves tools by `tool.name`
 - Is separate from staging and experimental registries
+
+### LLM Lab / Experimental Side Path
+
+`runtime_lab/llm_lab/` is present inside the repository, but it is not part of
+the stable execution flow.
+
+It may:
+
+- load documented repository context for external review
+- run local Mistral/Qwen chat scripts through Ollama
+- persist local chat memory in SQLite files under `runtime_lab/llm_lab/`
+- generate markdown HARDENING review reports under
+  `runtime_lab/llm_lab/reports/`
+
+It must not:
+
+- call `AgentService` or `/agent/run` automatically
+- act as Planner
+- execute production tools
+- modify `PolicyEngine`
+- register tools in the production `ToolRegistry`
 
 ### Production Tools
 
@@ -111,6 +133,8 @@ Current runtime response model contains:
 Current fields:
 
 - `user_input: str`
+- `tool: str | None`
+- `payload: dict | None`
 - `dry_run: bool = True`
 - `experimental_tool_generation: bool = False`
 
@@ -175,12 +199,15 @@ The current Planner returns only:
 - `planned`
 - `no_plan`
 
+The request field `experimental_tool_generation` exists in `AgentRequest`, but
+the current stable runtime does not use it to branch into a capability-gap flow.
+
 Experimental generated tools are not auto-registered in the production
 `ToolRegistry`.
 
 ## Verified Constraints and Limitations
 
-- Planner output is still implicit and not runtime-validated
+- Planner output is typed as `PlannedAction` and runtime-validated
 - `dry_run` is structurally enforced by the runtime: policy is evaluated, the
   tool step is traced, and the production tool is not executed
 - Policy is still largely name-based
@@ -193,6 +220,7 @@ Experimental generated tools are not auto-registered in the production
 The following must not be described as implemented production behavior:
 
 - Real LLM-backed planning
+- Mistral/Qwen participation in the production runtime
 - Auto-extension of production registry
 - Dynamic package installation
 - Arbitrary shell execution

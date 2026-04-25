@@ -63,9 +63,39 @@ Existen módulos y artefactos de laboratorio aislados en `runtime_lab/`, pero no
 forman parte del contrato estable actual del Planner. El Planner estable solo
 devuelve `planned` o `no_plan`.
 
+### LLM Lab / Ruta lateral experimental
+
+`runtime_lab/llm_lab/` vive dentro del repositorio para facilitar observación y
+consultas locales con Mistral/Qwen, pero no está integrado en el runtime de
+NUCLEO.
+
+Propósito:
+
+- cargar contexto documentado de NUCLEO para revisión externa
+- ejecutar chats locales de laboratorio con SQLite y Ollama
+- generar informes markdown de revisión HARDENING
+
+Estado actual:
+
+- experimental
+- ruta lateral de solo observación respecto al runtime productivo
+- sin integración con `AgentService`, `AgentRuntime`, `Planner`,
+  `PolicyEngine`, `ToolRegistry` ni `Tools`
+
+Prohibido para esta ruta:
+
+- ejecutar tools de producción
+- modificar policy
+- llamar automáticamente a `/agent/run`
+- actuar como Planner
+- registrar tools en el `ToolRegistry` de producción
+
+Referencia operativa: `docs/operations/operational_state.md`.
+
 ### No implementado todavía
 
 - Integración real con LLM para planificación
+- Integración de Mistral/Qwen en el flujo canónico
 - Promoción automática desde staging a producción
 - Ejecución de tools generadas en el registry principal
 - Persistencia operativa del runtime más allá de artefactos de laboratorio
@@ -100,7 +130,7 @@ El sistema utiliza API key por request mediante `Authorization: Bearer <token>`.
 
 Clave de desarrollo disponible en la configuración actual:
 
-
+- `dev-jose-key`
 
 ## Ejemplo de uso
 
@@ -137,7 +167,7 @@ curl -X POST http://127.0.0.1:8000/agent/run \
 }
 ```
 
-En `dry_run=true`, el runtime ejecuta Planner, ToolRegistry y PolicyEngine,
+En `dry_run=true`, el runtime ejecuta Planner, PolicyEngine y ToolRegistry,
 pero no llama a `Tool.run(...)`. La respuesta indica la tool que se habría
 ejecutado y marca `executed=false`.
 
@@ -153,7 +183,7 @@ AgentService
 ↓  
 AgentRuntime  
 ↓  
-Planner → ToolRegistry → PolicyEngine → Tool / dry_run  
+Planner → PolicyEngine → ToolRegistry → Tool / dry_run  
 ↓  
 AgentResponse
 

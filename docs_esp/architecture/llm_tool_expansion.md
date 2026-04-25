@@ -5,21 +5,38 @@
 
 ## Propósito
 
-Este documento describe un subsistema experimental y aislado para generación controlada de tools asistida por LLM en NUCLEO. El diseño amplía el runtime existente sin sustituir el pipeline estable de producción.
+Este documento describe un subsistema experimental y aislado para generación
+controlada de tools asistida por LLM en NUCLEO. Es un diseño de laboratorio y
+un conjunto de servicios aislados, no una rama activa del runtime estable
+actual.
 
 ## Ruta estable
 
 La ruta de producción permanece así:
 
-API -> AgentService -> AgentRuntime -> Planner -> PolicyEngine -> ToolRegistry -> Tool
+Request -> API/FastAPI -> AgentService -> AgentRuntime/Orchestrator -> Planner -> PolicyEngine -> ToolRegistry -> Tool -> AgentResponse
 
 Las tools existentes conservan su comportamiento actual.
 
 ## Ruta experimental
 
-Cuando el planner detecta un capability gap y la request habilita explícitamente el flujo de laboratorio, NUCLEO crea una proposal estructurada, la almacena en `runtime_lab/proposals/`, la registra en un staging registry aislado, genera un skeleton de tool bajo `runtime_lab/generated_tools/` y registra artefactos de audit bajo `runtime_lab/audit/`.
+El repositorio contiene servicios que pueden crear proposals estructuradas,
+almacenarlas en `runtime_lab/proposals/`, registrarlas en un staging registry
+aislado, generar skeletons de tool bajo `runtime_lab/generated_tools/` y
+registrar artefactos de audit bajo `runtime_lab/audit/`.
+
+Restricción importante del estado actual: el Planner estable no emite
+`capability_gap_detected`. Su contrato actual solo es `planned` o `no_plan`.
+El campo `experimental_tool_generation` existe en la request, pero el flujo
+estable de `/agent/run` no lo usa para activar esta ruta.
 
 Esta ruta nunca registra la tool generada en el `ToolRegistry` de producción.
+
+## Relación con llm_lab
+
+`runtime_lab/llm_lab/` es una ruta lateral separada para chats locales de
+Mistral/Qwen e informes HARDENING. No ejecuta esta ruta de expansión, no actúa
+como Planner y no registra tools.
 
 ## Propiedades de seguridad
 

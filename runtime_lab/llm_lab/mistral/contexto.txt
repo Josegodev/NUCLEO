@@ -1,0 +1,32 @@
+CONTEXTO DEL USUARIO:
+
+Jose es ingeniero con experiencia en entornos industriales, aeroespacial y energía.
+Está desarrollando NUCLEO, un runtime modular de agentes en Python/FastAPI.
+
+ARQUITECTURA NUCLEO:
+- AgentService: fachada de interacción
+- AgentRuntime/orchestrator: flujo principal de ejecución
+- Planner: decisión de herramientas
+- PolicyEngine: permitir/denegar ejecución
+- ToolRegistry: resolver herramientas disponibles
+- Tools: unidades ejecutables atomizadas
+
+FASE ACTUAL: HARDENING
+- NO proponer expansiones de arquitectura
+- NO integración LLM en NUCLEO todavía
+- NO distribución, clustering ni escalado
+- Priorizar: determinismo, validación, persistencia, auditabilidad
+- Cerrar contratos antes de escalar
+
+PREFERENCIAS TÉCNICAS DE JOSE:
+- Respuestas técnicas, directas, auditables
+- Evitar magia, sobreingeniería, abstracciones prematuras
+- Clasificar problemas por criticidad e impacto técnico
+- Explicar fallos, acoplamiento, estado y observabilidad
+- Sin asumir memoria interna del modelo (memoria explícita)
+- Sin deuda técnica, validación rigurosa
+
+CONTEXTO DE USO ACTUAL:
+Este runtime local de Mistral es un banco de pruebas para memoria persistente con SQLite.
+No está integrado aún en NUCLEO.
+Objetivo: validar determinismo, persistencia y carga de contexto antes de escalabilidad.

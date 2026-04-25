@@ -2,26 +2,37 @@
 
 ## Purpose
 
-This document describes an experimental, isolated subsystem for controlled LLM-assisted
-tool generation in NUCLEO. The design extends the existing runtime without replacing the
-stable production pipeline.
+This document describes an experimental, isolated subsystem for controlled
+LLM-assisted tool generation in NUCLEO. It is a lab design and set of isolated
+services, not an active branch of the current stable runtime.
 
 ## Stable Path
 
 The production path remains:
 
-API -> AgentService -> AgentRuntime -> Planner -> PolicyEngine -> ToolRegistry -> Tool
+Request -> API/FastAPI -> AgentService -> AgentRuntime/Orchestrator -> Planner -> PolicyEngine -> ToolRegistry -> Tool -> AgentResponse
 
 Existing tools keep their current behavior.
 
 ## Experimental Path
 
-When the planner detects a capability gap and the request explicitly enables the lab flow,
-NUCLEO creates a structured proposal, stores it under `runtime_lab/proposals/`, registers
-it in an isolated staging registry, generates a tool skeleton under
-`runtime_lab/generated_tools/`, and records audit artifacts under `runtime_lab/audit/`.
+The repository contains services that can create structured proposals, store
+them under `runtime_lab/proposals/`, register them in an isolated staging
+registry, generate tool skeletons under `runtime_lab/generated_tools/`, and
+record audit artifacts under `runtime_lab/audit/`.
+
+Important current-state constraint: the stable Planner does not emit
+`capability_gap_detected`. Its current contract is only `planned` or `no_plan`.
+The `experimental_tool_generation` request field exists, but the stable
+`/agent/run` flow does not use it to activate this path.
 
 This path never registers the generated tool in the production `ToolRegistry`.
+
+## Relationship to llm_lab
+
+`runtime_lab/llm_lab/` is a separate lateral observation path for local
+Mistral/Qwen chats and HARDENING reports. It does not execute this expansion
+path, does not act as Planner, and does not register tools.
 
 ## Safety Properties
 

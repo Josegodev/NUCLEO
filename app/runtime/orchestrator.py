@@ -14,8 +14,8 @@ Responsable de:
 Flujo:
 AgentRequest
     → Planner (create_plan)
-    → ToolRegistry (get tool)
     → PolicyEngine (evaluate)
+    → ToolRegistry (get tool)
     → Tool (run)
     → AgentResponse
 
@@ -97,24 +97,6 @@ class AgentRuntime:
         tool_name = plan.tool_name
         tool_payload = plan.payload
 
-        tool = self._registry.get(tool_name)
-        self._safe_record_step(
-            trace=trace,
-            phase="registry",
-            input={"tool": tool_name},
-            output={
-                "found": tool is not None,
-                "tool": getattr(tool, "name", None),
-            },
-            status="success" if tool else "error",
-            error=None if tool else f"Planner proposed unknown tool: {tool_name}",
-        )
-        if not tool:
-            return AgentResponse(
-                status="error",
-                message=f"Planner proposed unknown tool: {tool_name}",
-            )
-
         policy_decision = self._policy_engine.evaluate(
             tool_name=tool_name,
             payload=tool_payload,
@@ -144,6 +126,24 @@ class AgentRuntime:
             return AgentResponse(
                 status="blocked",
                 message=policy_decision.reason,
+            )
+
+        tool = self._registry.get(tool_name)
+        self._safe_record_step(
+            trace=trace,
+            phase="registry",
+            input={"tool": tool_name},
+            output={
+                "found": tool is not None,
+                "tool": getattr(tool, "name", None),
+            },
+            status="success" if tool else "error",
+            error=None if tool else f"Planner proposed unknown tool: {tool_name}",
+        )
+        if not tool:
+            return AgentResponse(
+                status="error",
+                message=f"Planner proposed unknown tool: {tool_name}",
             )
 
         if request.dry_run:

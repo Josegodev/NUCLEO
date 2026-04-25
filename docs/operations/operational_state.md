@@ -16,8 +16,8 @@ AgentRequest
 → AgentService  
 → AgentRuntime  
 → Planner  
-→ ToolRegistry  
 → PolicyEngine  
+→ ToolRegistry  
 → Tool  
 → AgentResponse
 
@@ -38,7 +38,8 @@ AgentRequest
 ### Runtime
 
 - Coordinates planner, policy, registry, tool execution
-- Validates planner output before registry, policy, or tool execution
+- Evaluates policy before resolving the executable tool instance
+- Validates planner output before policy, registry, or tool execution
 - Returns `no_plan` without executing tools when planner has no deterministic match
 
 ### Planner
@@ -53,6 +54,7 @@ AgentRequest
 
 - Deny-by-default on production tool names
 - Allows `echo`
+- Allows `disk_info`
 - Allows `system_info` only for admin context
 
 ### Production Tools
@@ -69,6 +71,50 @@ AgentRequest
 - Audit store
 - All isolated under `runtime_lab/`
 
+### LLM Lab / Experimental Side Path
+
+`runtime_lab/llm_lab/` exists inside the repository, but it is a lateral
+experimental observation path. It is not part of the production runtime.
+
+Purpose:
+
+- load NUCLEO context for external/local model questions
+- run local Mistral/Qwen chats through Ollama
+- keep local chat memory in SQLite files under `runtime_lab/llm_lab/`
+- generate HARDENING review reports under `runtime_lab/llm_lab/reports/`
+
+Current integration with runtime:
+
+- none
+- no calls to `AgentService`
+- no calls to `AgentRuntime`
+- no interaction with `Planner`, `PolicyEngine`, `ToolRegistry`, or production
+  `Tools`
+
+Permissions:
+
+- read repository context
+- write lab-only reports and lab-only SQLite memory
+- observe and summarize
+
+Forbidden actions:
+
+- execute production tools
+- modify policy
+- call `/agent/run` automatically
+- act as Planner
+- register tools in the production `ToolRegistry`
+
+Related context-export script:
+
+- `scripts/export_nucleo_context.py` reads `README.md`,
+  `docs/architecture.md`, `docs/operations/operational_state.md`,
+  `docs/operations/session_log.md`, and `docs/modules/*.md`
+- it writes `llm_context/nucleo_context_snapshot.md` and
+  `llm_context/nucleo_context_snapshot.json`
+- it must not import or call `AgentService`, `AgentRuntime`, `Planner`,
+  `PolicyEngine`, `ToolRegistry`, or `Tools`
+
 ## Verified Technical Characteristics
 
 - `ExecutionContext` is currently part of the runtime pipeline
@@ -78,12 +124,14 @@ AgentRequest
 - `dry_run` is structurally enforced: tools are not executed
 - Production policy does not deeply evaluate payload
 - Experimental generated tools are not auto-registered in production
+- Mistral/Qwen are not part of the production execution flow
 
 ## Operational Constraints
 
 - Single-machine local execution is the current explicit operating model
 - Production and lab paths coexist in the codebase but must remain separated
-- Experimental generation is request-gated, not ambient behavior
+- Experimental generation services exist as isolated code and are not connected
+  to the stable `/agent/run` flow
 - Runtime simplicity is still prioritized over aggressive expansion
 
 ## Open Issues
@@ -92,6 +140,8 @@ AgentRequest
 - No full structured runtime error taxonomy
 - Runtime trace is in-memory only and not exposed through API
 - No production promotion workflow for lab-generated tools
+- Mixing `llm_lab` outputs with runtime decisions would break the current
+  deterministic boundary
 
 ## Working Rules
 

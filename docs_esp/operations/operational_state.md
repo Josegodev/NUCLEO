@@ -1,5 +1,5 @@
 > Archivo origen: `docs/operations/operational_state.md`
-> Última sincronización: `2026-04-19`
+> Última sincronización: `2026-04-25`
 
 # Estado operativo - NUCLEO
 
@@ -24,14 +24,6 @@ AgentRequest
 -> Tool  
 -> AgentResponse
 
-Rama experimental opt-in:
-
-AgentRequest con `experimental_tool_generation=True`  
--> Planner puede emitir `capability_gap_detected`  
--> AgentRuntime gestiona proposal / staging / generación de skeleton  
--> devuelve una respuesta controlada de `capability_gap`  
--> el registry de producción no cambia
-
 ## Componentes en operación actual
 
 ### API
@@ -49,24 +41,30 @@ AgentRequest con `experimental_tool_generation=True`
 ### Runtime
 
 - coordina planner, policy, registry y ejecución de tools
-- contiene la ruta actual de manejo de capability gap experimental
+- evalúa policy antes de resolver la instancia ejecutable de la tool
+- valida la salida del planner antes de policy, registry o ejecución de tools
+- devuelve `no_plan` sin ejecutar tools cuando el planner no encuentra una coincidencia determinista
 
 ### Planner
 
 - basado en reglas
-- devuelve contratos implícitos tipo dict
-- puede emitir señal experimental de gap solo cuando la request hace opt-in explícito
+- usa una pequeña tabla explícita de reglas deterministas
+- devuelve `PlannedAction` tipado
+- emite `planned` o `no_plan`
+- no autoriza ni ejecuta tools
 
 ### PolicyEngine
 
 - deny-by-default sobre nombres de tools de producción
 - permite `echo`
+- permite `disk_info`
 - permite `system_info` solo para contexto admin
 
 ### Tools de producción
 
 - `echo`
 - `system_info`
+- `disk_info`
 
 ### Experimental Lab
 
@@ -76,31 +74,77 @@ AgentRequest con `experimental_tool_generation=True`
 - AuditStore
 - todo aislado bajo `runtime_lab/`
 
+### LLM Lab / Ruta lateral experimental
+
+`runtime_lab/llm_lab/` existe dentro del repositorio, pero es una ruta lateral
+experimental de observación. No forma parte del runtime de producción.
+
+Propósito:
+
+- cargar contexto de NUCLEO para preguntas externas o locales
+- ejecutar chats locales de Mistral/Qwen mediante Ollama
+- mantener memoria local de chat en SQLite bajo `runtime_lab/llm_lab/`
+- generar informes de revisión HARDENING bajo `runtime_lab/llm_lab/reports/`
+
+Integración actual con el runtime:
+
+- ninguna
+- no llama a `AgentService`
+- no llama a `AgentRuntime`
+- no interactúa con `Planner`, `PolicyEngine`, `ToolRegistry` ni `Tools` de
+  producción
+
+Permisos:
+
+- leer contexto del repositorio
+- escribir informes y memoria SQLite solo dentro del laboratorio
+- observar y resumir
+
+Acciones prohibidas:
+
+- ejecutar tools de producción
+- modificar policy
+- llamar automáticamente a `/agent/run`
+- actuar como Planner
+- registrar tools en el `ToolRegistry` de producción
+
+Script relacionado de exportación de contexto:
+
+- `scripts/export_nucleo_context.py` lee `README.md`,
+  `docs/architecture.md`, `docs/operations/operational_state.md`,
+  `docs/operations/session_log.md` y `docs/modules/*.md`
+- escribe `llm_context/nucleo_context_snapshot.md` y
+  `llm_context/nucleo_context_snapshot.json`
+- no debe importar ni llamar a `AgentService`, `AgentRuntime`, `Planner`,
+  `PolicyEngine`, `ToolRegistry` ni `Tools`
+
 ## Características técnicas verificadas
 
 - `ExecutionContext` forma actualmente parte del pipeline del runtime
 - `AgentResponse` expone actualmente `result` estructurado
-- el registro de tools de producción ocurre en tiempo de importación dentro del runtime orchestrator
-- la salida del planner sigue siendo implícita
-- `dry_run` aún no se impone de forma estructural en la ejecución de producción
+- el registro de tools de producción ocurre en el registry de producción
+- la salida del planner está tipada como `PlannedAction`
+- `dry_run` se impone de forma estructural: las tools no se ejecutan
 - la policy de producción no evalúa el payload en profundidad
 - las tools experimentales generadas no se auto-registran en producción
+- Mistral/Qwen no forman parte del flujo de ejecución de producción
 
 ## Restricciones operativas
 
 - la ejecución local en una sola máquina es el modelo operativo explícito actual
 - las rutas de producción y laboratorio coexisten en el código, pero deben permanecer separadas
-- la generación experimental está gated por request, no es comportamiento ambiental
+- los servicios de generación experimental existen como código aislado y no
+  están conectados al flujo estable de `/agent/run`
 - la simplicidad del runtime sigue siendo prioritaria frente a la expansión agresiva
 
 ## Issues abiertos
 
-- no existe un execution plan tipado explícito
 - no hay validación completa de payload por tool
 - no existe una taxonomía completa de errores estructurados en runtime
-- no hay un audit trail integrado para producción
+- la traza del runtime está en memoria y no se expone por API
 - no existe workflow de promoción a producción para tools generadas en laboratorio
-- la semántica de `dry_run` sigue incompleta
+- mezclar salidas de `llm_lab` con decisiones del runtime rompería el límite
+  determinista actual
 
 ## Reglas de trabajo
 

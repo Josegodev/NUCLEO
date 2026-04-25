@@ -2,6 +2,7 @@ import unittest
 
 from app.api.routes.agent import run_agent
 from app.main import app
+from app.policies.engine import PolicyEngine
 from app.policies.models import PolicyDecision
 from app.runtime.orchestrator import AgentRuntime
 from app.runtime.planner import Planner
@@ -113,7 +114,7 @@ class RuntimeTracingTests(unittest.TestCase):
 
         self.assertEqual(response.status, "success")
         self.assertEqual(tool.calls, 1)
-        self.assertEqual([step.phase for step in trace.steps], ["planner", "registry", "policy", "tool"])
+        self.assertEqual([step.phase for step in trace.steps], ["planner", "policy", "registry", "tool"])
         self.assertEqual([step.status for step in trace.steps], ["success", "success", "success", "success"])
 
     def test_denied_execution_records_planner_policy_and_does_not_run_tool(self) -> None:
@@ -131,8 +132,8 @@ class RuntimeTracingTests(unittest.TestCase):
 
         self.assertEqual(response.status, "blocked")
         self.assertEqual(tool.calls, 0)
-        self.assertEqual([step.phase for step in trace.steps], ["planner", "registry", "policy"])
-        self.assertEqual(trace.steps[2].status, "denied")
+        self.assertEqual([step.phase for step in trace.steps], ["planner", "policy"])
+        self.assertEqual(trace.steps[1].status, "denied")
 
     def test_dry_run_with_system_info_records_registry_and_skipped_tool(self) -> None:
         tool = SpyTool()
@@ -150,14 +151,14 @@ class RuntimeTracingTests(unittest.TestCase):
 
         self.assertEqual(response.status, "dry_run_success")
         self.assertEqual(tool.calls, 0)
-        self.assertEqual([step.phase for step in trace.steps], ["planner", "registry", "policy", "tool"])
+        self.assertEqual([step.phase for step in trace.steps], ["planner", "policy", "registry", "tool"])
         self.assertEqual(trace.steps[3].status, "skipped")
         self.assertEqual(trace.steps[3].output["executed"], False)
         self.assertEqual(trace.steps[3].output["reason"], "dry_run")
 
-    def test_unknown_tool_proposed_by_planner_is_blocked_at_registry(self) -> None:
+    def test_unknown_tool_proposed_by_planner_is_blocked_by_policy(self) -> None:
         runtime_tracer = tracer()
-        policy_engine = StaticPolicyEngine("allow", "allowed")
+        policy_engine = StaticPolicyEngine("deny", "tool 'missing' is not allowed by policy")
         runtime = AgentRuntime(
             runtime_planner=StaticPlanner(planned_action("missing")),
             runtime_policy_engine=policy_engine,
@@ -168,11 +169,11 @@ class RuntimeTracingTests(unittest.TestCase):
         response = runtime.run(AgentRequest(dry_run=False), context())
         trace = runtime_tracer.get_trace("trace-req-1")
 
-        self.assertEqual(response.status, "error")
-        self.assertEqual(policy_engine.calls, 0)
-        self.assertEqual([step.phase for step in trace.steps], ["planner", "registry"])
-        self.assertEqual(trace.steps[1].status, "error")
-        self.assertIn("unknown tool", trace.steps[1].error)
+        self.assertEqual(response.status, "blocked")
+        self.assertEqual(policy_engine.calls, 1)
+        self.assertEqual([step.phase for step in trace.steps], ["planner", "policy"])
+        self.assertEqual(trace.steps[1].status, "denied")
+        self.assertIn("not allowed by policy", trace.steps[1].error)
 
     def test_tracer_failure_does_not_execute_denied_tool(self) -> None:
         tool = SpyTool()
@@ -210,6 +211,27 @@ class RuntimeTracingTests(unittest.TestCase):
         fields = set(AgentResponse.model_fields)
 
         self.assertEqual(fields, {"status", "message", "result"})
+
+    def test_policy_denies_registered_tool_not_in_explicit_allowlist(self) -> None:
+        decision = PolicyEngine(tool_registry=StaticRegistry(SpyTool())).evaluate(
+            tool_name="spy",
+            payload={},
+            dry_run=True,
+            context=context(),
+        )
+
+        self.assertEqual(decision.decision, "deny")
+        self.assertIn("not allowed by policy", decision.reason)
+
+    def test_policy_allows_disk_info_for_authenticated_context(self) -> None:
+        decision = PolicyEngine().evaluate(
+            tool_name="disk_info",
+            payload={},
+            dry_run=True,
+            context=context(),
+        )
+
+        self.assertEqual(decision.decision, "allow")
 
     def test_known_input_returns_expected_planner_result(self) -> None:
         result = Planner().create_plan(AgentRequest(user_input="system info", dry_run=True))
