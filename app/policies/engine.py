@@ -44,9 +44,14 @@ planner → policy → execution
 
 from app.policies.models import PolicyDecision
 from app.schemas.context import ExecutionContext
+from app.tools.registry import ToolRegistry
+from app.tools.registry import registry as default_registry
 
 
 class PolicyEngine:
+    def __init__(self, tool_registry: ToolRegistry = default_registry) -> None:
+        self._tool_registry = tool_registry
+
     def evaluate(
         self,
         tool_name: str,
@@ -60,7 +65,7 @@ class PolicyEngine:
                 reason="unauthenticated request",
             )
 
-        if tool_name not in {"echo", "system_info", "disk_info"}:
+        if self._tool_registry.get(tool_name) is None:
             return PolicyDecision(
                 decision="deny",
                 reason=f"tool '{tool_name}' is not allowed by policy",

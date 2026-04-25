@@ -153,3 +153,30 @@
 - Next steps:
   - clean response layer
   - add more local system-observation tools
+
+## 2026-04-23
+
+- Recovered system baseline after rollback
+- Identified critical issues:
+  - PolicyDecision not closed
+  - Policy/Registry drift risk
+  - Missing deterministic runner
+- Entering HARDENING phase (contracts + determinism)
+
+## 2026-04-25
+
+- Added minimal internal runtime tracing:
+  - `ExecutionTrace`
+  - `ExecutionStep`
+  - `Tracer`
+  - `InMemoryTracer`
+- Integrated tracing in `AgentRuntime` for:
+  - planner result
+  - policy decision
+  - registry resolution
+  - tool execution or dry-run skip
+- Kept trace internal and out of the public `AgentResponse` contract.
+- Enforced `dry_run=True` as non-executing runtime behavior while still tracing
+  the intended tool step as `skipped`.
+- Added unittest coverage for allowed, denied, dry-run, unknown-tool, tool-error,
+  tracer-failure, and API response-contract behavior.

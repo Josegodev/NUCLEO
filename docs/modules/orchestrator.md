@@ -12,15 +12,46 @@ Central execution orchestrator of the production runtime, with a minimal isolate
 
 `AgentRuntime.run(request, context)` currently:
 
-1. asks the planner for a plan
-2. if the plan signals `capability_gap_detected`, routes into the isolated lab flow
-3. otherwise extracts production `tool` and `payload`
-4. asks `PolicyEngine` for authorization
-5. if denied, returns `blocked`
-6. resolves the tool from production `ToolRegistry`
-7. if missing, returns `error`
-8. executes `tool.run(payload, context=context)`
-9. returns `AgentResponse`
+1. starts an internal in-memory execution trace
+2. asks the planner for a plan
+3. records the planner step
+4. if the plan signals `capability_gap_detected`, routes into the isolated lab flow
+5. otherwise extracts production `tool` and `payload`
+6. asks `PolicyEngine` for authorization
+7. records the policy step
+8. if denied, returns `blocked`
+9. resolves the tool from production `ToolRegistry`
+10. records the registry step
+11. if missing, records the registry step as `error` and returns `error`
+12. if `dry_run=True`, records a tool step as `skipped` with `executed=False` and does not run the tool
+13. otherwise executes `tool.run(payload, context=context)`
+14. records success or error for the tool step
+15. returns `AgentResponse`
+
+## Internal Trace Contract
+
+Tracing is implemented in `app/runtime/tracing.py` and is intentionally
+in-memory only.
+
+`ExecutionTrace`:
+
+- `trace_id`
+- `request_id`
+- `steps`
+
+`ExecutionStep`:
+
+- `step_id`
+- `phase`: `planner`, `policy`, `registry`, or `tool`
+- `input`
+- `output`
+- `status`: `success`, `denied`, `error`, or `skipped`
+- `error`
+- `timestamp`
+
+Tracer failures are isolated from authorization and execution decisions. A
+tracing failure must not cause a denied tool to execute and must not hide a real
+tool error.
 
 ## Verified Experimental Branch
 
@@ -40,13 +71,13 @@ This does not register the tool in the production registry.
 - Explicit policy check before production tool execution
 - Explicit handling of missing production tool
 - Experimental branch remains isolated from production registry
+- Minimal internal trace for planner, policy, registry, and tool stages
 
 ## Current Limitations
 
 - Planner contract still implicit
 - Runtime composition still happens at import time
 - Limited exception handling
-- `dry_run` still not structurally enforced for production tools
 - Response still duplicates data between `message` and `result`
 
 ## Status Label

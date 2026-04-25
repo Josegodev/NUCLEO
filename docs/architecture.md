@@ -29,6 +29,9 @@ AgentRequest
 → Tool  
 → AgentResponse
 
+The runtime also records an internal in-memory execution trace for each
+execution. This trace is not part of the public API response contract.
+
 ## Verified Endpoints
 
 - `GET /` -> health response
@@ -57,6 +60,7 @@ AgentRequest
 - Calls policy engine
 - Resolves tools through production registry
 - Executes production tools
+- Records internal planner, policy, and tool steps through the runtime tracer
 - Returns `AgentResponse`
 
 ### Planner
@@ -86,6 +90,7 @@ Currently registered at import time in the production runtime:
 
 - `echo`
 - `system_info`
+- `disk_info`
 
 ### AgentResponse
 
@@ -129,6 +134,29 @@ Current fields:
 - `decision`
 - `reason`
 
+### Runtime Trace
+
+Internal-only tracing is implemented in `app/runtime/tracing.py`.
+
+`ExecutionTrace` contains:
+
+- `trace_id`
+- `request_id`
+- `steps`
+
+Each `ExecutionStep` contains:
+
+- `step_id`
+- `phase` (`planner`, `policy`, `registry`, or `tool`)
+- `input`
+- `output`
+- `status` (`success`, `denied`, `error`, or `skipped`)
+- `error`
+- `timestamp`
+
+The first implementation is `InMemoryTracer`. It has no disk persistence and no
+external integration.
+
 ## Verified Experimental Subsystem
 
 An experimental subsystem for controlled tool proposal and skeleton generation is implemented in isolated modules and `runtime_lab/`.
@@ -153,7 +181,8 @@ Experimental generated tools are not auto-registered in the production `ToolRegi
 ## Verified Constraints and Limitations
 
 - Planner output is still implicit and not runtime-validated
-- `dry_run` is still propagated but not structurally enforced for production tool execution
+- `dry_run` is structurally enforced by the runtime: policy is evaluated, the
+  tool step is traced, and the production tool is not executed
 - Policy is still largely name-based
 - Tool metadata such as `read_only` and `risk_level` are not yet enforced by policy
 - Production bootstrap still happens at module import time in `orchestrator.py`

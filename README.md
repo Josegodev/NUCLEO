@@ -62,7 +62,9 @@ Existe una ruta experimental de laboratorio para propuestas y skeletons de tools
 - Persistencia operativa del runtime más allá de artefactos de laboratorio
 - Trazabilidad completa de producción integrada en el pipeline estable
 
-## Quick start
+## Quick start:
+
+source .venv/bin/activate
 
 ### 1. Instalar dependencias
 
