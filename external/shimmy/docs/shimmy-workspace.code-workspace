@@ -1,0 +1,22 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../../seer"
+		}
+	],
+	"settings": {
+		"workbench.colorCustomizations": {
+			"titleBar.activeBackground": "#38165A",
+			"titleBar.inactiveBackground": "#2B094D",
+			"titleBar.activeForeground": "#FFFFFF",
+			"titleBar.inactiveForeground": "#EEEEEE",
+			"activityBar.background": "#38165A",
+			"activityBar.foreground": "#FFFFFF",
+			"statusBar.background": "#1F0041",
+			"statusBar.foreground": "#FFFFFF"
+		}
+	}
+}

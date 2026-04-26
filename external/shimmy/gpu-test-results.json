@@ -1,0 +1,24 @@
+{
+  "test_timestamp": "2026-01-09T05:09:20Z",
+  "binary_path": "./target-gpu/debug/shimmy.exe",
+  "test_image": "assets/vision-samples/final-test.png",
+  "platform": "windows-x86_64",
+  "cpu_only": false,
+  "total_duration_seconds": 1.16,
+  "success": true,
+  "results": {
+    "server_started": true,
+    "vision_tests": [
+      {
+        "image": "assets/vision-samples/final-test.png",
+        "response_received": true,
+        "license_error": true,
+        "has_text_blocks": false,
+        "text_blocks_count": 0
+      }
+    ],
+    "license_validation": true,
+    "performance_warnings": [],
+    "errors": []
+  }
+}

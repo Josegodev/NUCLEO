@@ -1,0 +1,1 @@
+{"rustc":3062648155896360161,"features":"","declared_features":"","target":0,"profile":0,"path":0,"deps":[[857979250431893282,"build_script_build",false,5893736648443941375]],"local":[{"RerunIfChanged":{"output":"debug\\build\\typenum-db1b6821c580a823\\output","paths":["tests"]}}],"rustflags":[],"config":0,"compile_kind":0}
