@@ -1,5 +1,5 @@
 > Archivo origen: `docs/operations/operational_state.md`
-> Última sincronización: `2026-04-25`
+> Última sincronización: `2026-04-26`
 
 # Estado operativo - NUCLEO
 
@@ -30,6 +30,7 @@ AgentRequest
 
 - aplicación FastAPI
 - `POST /agent/run`
+- `POST /agent/run` acepta `X-Idempotency-Key` opcional
 - `GET /tools`
 - `GET /`
 
@@ -128,6 +129,21 @@ Script relacionado de exportación de contexto:
 - la policy de producción no evalúa el payload en profundidad
 - las tools experimentales generadas no se auto-registran en producción
 - Mistral/Qwen no forman parte del flujo de ejecución de producción
+- la idempotencia de `POST /agent/run` se gestiona en el borde API, antes de que
+  `AgentService` delegue en `AgentRuntime`
+
+## Contrato de idempotencia de `/agent/run`
+
+- Sin `X-Idempotency-Key`, `/agent/run` conserva el comportamiento existente y
+  delega cada request en `AgentService`.
+- Con un `X-Idempotency-Key` no vacío de 128 caracteres como máximo, el primer
+  request almacena la `AgentResponse` devuelta en memoria del proceso.
+- Un reintento con el mismo principal autenticado y la misma clave de idempotencia
+  devuelve la `AgentResponse` cacheada sin llamar otra vez a `AgentRuntime`.
+- El cache es local al proceso Python actual. No usa Redis, no se comparte entre
+  workers y se pierde al reiniciar el proceso.
+- La idempotencia no está implementada dentro de `AgentRuntime`, `Planner`,
+  `PolicyEngine`, `ToolRegistry` ni tools.
 
 ## Restricciones operativas
 

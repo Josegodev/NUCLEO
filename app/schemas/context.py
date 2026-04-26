@@ -8,8 +8,9 @@ definir ExecutionContext como modelo Pydantic
 
 """
 
-from pydantic import BaseModel, Field
 from typing import List, Optional
+
+from pydantic import BaseModel, Field
 
 
 class ExecutionContext(BaseModel):
@@ -19,5 +20,6 @@ class ExecutionContext(BaseModel):
     authenticated: bool = True
     auth_method: str = "api_key"
     request_id: str
+    idempotency_key: Optional[str] = None
     api_key_name: Optional[str] = None
     client_ip: Optional[str] = None

@@ -27,6 +27,7 @@ AgentRequest
 
 - FastAPI application
 - `POST /agent/run`
+- `POST /agent/run` accepts optional `X-Idempotency-Key`
 - `GET /tools`
 - `GET /`
 
@@ -125,6 +126,21 @@ Related context-export script:
 - Production policy does not deeply evaluate payload
 - Experimental generated tools are not auto-registered in production
 - Mistral/Qwen are not part of the production execution flow
+- `POST /agent/run` idempotency is handled at the API boundary, before
+  `AgentService` delegates into `AgentRuntime`
+
+## `/agent/run` Idempotency Contract
+
+- Without `X-Idempotency-Key`, `/agent/run` keeps the existing behavior and
+  delegates every request to `AgentService`.
+- With a non-empty `X-Idempotency-Key` of at most 128 characters, the first
+  request stores the returned `AgentResponse` in process memory.
+- A retry using the same authenticated principal and same idempotency key returns
+  the cached `AgentResponse` without calling `AgentRuntime` again.
+- The cache is local to the current Python process. It is not Redis-backed, not
+  shared across workers, and is reset on process restart.
+- Idempotency is not implemented inside `AgentRuntime`, `Planner`,
+  `PolicyEngine`, `ToolRegistry`, or tools.
 
 ## Operational Constraints
 

@@ -15,9 +15,8 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.core.auth import authenticate_api_key
 from app.schemas.context import ExecutionContext
 
-from fastapi.security import HTTPBearer
-
 security = HTTPBearer()
+
 
 def get_execution_context(
     request: Request,
