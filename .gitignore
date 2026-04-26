@@ -1,18 +1,33 @@
-# Entorno virtual
+# Python environment
 .venv/
 
-# Python cache
+# Python cache/build output
 __pycache__/
 *.pyc
 
-# Archivos temporales
+# Runtime logs and temporary files
 *.log
 *.tmp
+*.tmp.json
+*.jsonl
 
-# Sistema
+# llm_lab generated artifacts
+runtime_lab/llm_lab/artifacts/*
+!runtime_lab/llm_lab/artifacts/.gitkeep
+
+# External research repositories
+external/*
+!external/**/
+!external/**/*.md
+
+# Accidental Rust/Node build artifacts
+**/target/
+**/node_modules/
+
+# System/editor files
 .DS_Store
 Thumbs.db
-
-# Archivos locales
-estructura.txt
 .vscode/
+
+# Local scratch files
+estructura.txt

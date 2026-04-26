@@ -1,6 +1,8 @@
+from typing import Literal
+
 from pydantic import BaseModel
 
 
 class PolicyDecision(BaseModel):
-    decision: str
+    decision: Literal["allow", "deny"]
     reason: str

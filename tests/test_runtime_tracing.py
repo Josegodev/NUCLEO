@@ -233,6 +233,10 @@ class RuntimeTracingTests(unittest.TestCase):
 
         self.assertEqual(decision.decision, "allow")
 
+    def test_policy_decision_rejects_unknown_decision_value(self) -> None:
+        with self.assertRaises(ValueError):
+            PolicyDecision(decision="unknown", reason="invalid policy result")
+
     def test_known_input_returns_expected_planner_result(self) -> None:
         result = Planner().create_plan(AgentRequest(user_input="system info", dry_run=True))
 

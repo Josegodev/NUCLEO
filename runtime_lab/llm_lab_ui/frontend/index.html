@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NUCLEO llm_lab UI</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f7f7f4;
+        --panel: #ffffff;
+        --text: #1c1f23;
+        --muted: #646b73;
+        --line: #d9ddd8;
+        --accent: #18635a;
+        --error: #a33a2f;
+        --ok: #236b3f;
+        --warn: #936514;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      header {
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+        padding: 14px 20px;
+      }
+
+      h1 {
+        font-size: 18px;
+        line-height: 1.2;
+        margin: 0;
+      }
+
+      .subtle {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      main {
+        display: grid;
+        grid-template-columns: 360px minmax(0, 1fr);
+        gap: 16px;
+        padding: 16px;
+      }
+
+      section,
+      aside,
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      aside,
+      section {
+        padding: 14px;
+      }
+
+      label {
+        display: block;
+        font-size: 13px;
+        font-weight: 650;
+        margin: 12px 0 6px;
+      }
+
+      textarea,
+      input,
+      select,
+      button {
+        font: inherit;
+      }
+
+      textarea,
+      input,
+      select {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 9px 10px;
+        background: #fff;
+      }
+
+      textarea {
+        min-height: 130px;
+        resize: vertical;
+      }
+
+      button {
+        border: 0;
+        border-radius: 6px;
+        background: var(--accent);
+        color: white;
+        padding: 9px 12px;
+        cursor: pointer;
+        margin-top: 12px;
+        width: 100%;
+      }
+
+      button:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
+      .layout-stack {
+        display: grid;
+        gap: 16px;
+      }
+
+      .artifact-list {
+        display: grid;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .artifact-item {
+        text-align: left;
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--text);
+        width: 100%;
+        margin: 0;
+      }
+
+      .artifact-item.active {
+        outline: 2px solid var(--accent);
+      }
+
+      .status {
+        display: inline-block;
+        border-radius: 999px;
+        padding: 2px 8px;
+        font-size: 12px;
+        font-weight: 700;
+        border: 1px solid currentColor;
+      }
+
+      .status.success {
+        color: var(--ok);
+      }
+
+      .status.partial_success {
+        color: var(--warn);
+      }
+
+      .status.error {
+        color: var(--error);
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 10px;
+      }
+
+      .card {
+        padding: 12px;
+      }
+
+      .card h3,
+      section h2 {
+        margin: 0 0 8px;
+      }
+
+      section h2 {
+        font-size: 16px;
+      }
+
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+      }
+
+      pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+        margin: 8px 0 0;
+        background: #f3f4f0;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 10px;
+      }
+
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 7px;
+        text-align: left;
+      }
+
+      .error-panel {
+        border-left: 4px solid var(--error);
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      @media (max-width: 900px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>NUCLEO llm_lab UI</h1>
+      <div class="subtle">Local lab surface only. No Runtime, no tools, no policy, no external APIs.</div>
+    </header>
+
+    <main>
+      <aside>
+        <h2>Run Experiment</h2>
+        <form id="run-form">
+          <label for="prompt">Prompt</label>
+          <textarea id="prompt" required>Compare local inference and remote inference for HARDENING.</textarea>
+
+          <label for="mode">Mode</label>
+          <select id="mode">
+            <option value="mock">mock errors</option>
+            <option value="mock-success">mock success</option>
+            <option value="ollama">ollama</option>
+          </select>
+
+          <label for="stage1">Stage 1 models</label>
+          <input id="stage1" value="qwen,mistral" />
+
+          <label for="stage2">Stage 2 reviewers</label>
+          <input id="stage2" value="qwen,mistral" />
+
+          <label for="chairman">Chairman</label>
+          <input id="chairman" value="qwen" />
+
+          <button id="run-button" type="submit">Run</button>
+        </form>
+
+        <p id="run-message" class="subtle"></p>
+
+        <div class="toolbar">
+          <h2>Artifacts</h2>
+          <button id="refresh" type="button" style="width:auto;margin:0;">Refresh</button>
+        </div>
+        <div id="artifact-list" class="artifact-list"></div>
+      </aside>
+
+      <div class="layout-stack">
+        <section>
+          <div class="toolbar">
+            <h2>Artifact Detail</h2>
+            <span id="artifact-status"></span>
+          </div>
+          <div id="artifact-summary" class="subtle">Select or run an experiment.</div>
+        </section>
+
+        <section>
+          <h2>Stage 1 Responses</h2>
+          <div id="stage1-output" class="grid"></div>
+        </section>
+
+        <section>
+          <h2>Stage 2 Reviews</h2>
+          <div id="stage2-output" class="grid"></div>
+        </section>
+
+        <section>
+          <h2>Aggregate Rankings</h2>
+          <div id="aggregate-output"></div>
+        </section>
+
+        <section>
+          <h2>Stage 3 Synthesis</h2>
+          <div id="stage3-output"></div>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const api = {
+        async listArtifacts() {
+          const res = await fetch('/api/artifacts');
+          if (!res.ok) throw new Error(await res.text());
+          return res.json();
+        },
+        async getArtifact(id) {
+          const res = await fetch(`/api/artifacts/${encodeURIComponent(id)}`);
+          if (!res.ok) throw new Error(await res.text());
+          return res.json();
+        },
+        async createExperiment(payload) {
+          const res = await fetch('/api/experiments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) throw new Error(await res.text());
+          return res.json();
+        },
+      };
+
+      let selectedId = null;
+
+      function csv(value) {
+        return value.split(',').map((item) => item.trim()).filter(Boolean);
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? '')
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#039;');
+      }
+
+      function statusPill(status) {
+        return `<span class="status ${escapeHtml(status)}">${escapeHtml(status)}</span>`;
+      }
+
+      async function refreshArtifacts() {
+        const list = await api.listArtifacts();
+        const root = document.getElementById('artifact-list');
+        root.innerHTML = list.map((item) => `
+          <button class="artifact-item ${item.experiment_id === selectedId ? 'active' : ''}" data-id="${escapeHtml(item.experiment_id)}" ${item.contract_valid === false ? 'disabled' : ''}>
+            <div>${statusPill(item.status)} <span class="mono">${escapeHtml(item.experiment_id)}</span></div>
+            <div class="subtle">${escapeHtml(item.created_at)}</div>
+            <div>${escapeHtml(item.input_preview)}</div>
+            ${item.contract_valid === false ? `<div class="subtle">${escapeHtml(item.contract_error)}</div>` : ''}
+          </button>
+        `).join('');
+        root.querySelectorAll('button[data-id]:not(:disabled)').forEach((button) => {
+          button.addEventListener('click', () => loadArtifact(button.dataset.id).catch((error) => {
+            document.getElementById('artifact-summary').textContent = `Error: ${error.message}`;
+          }));
+        });
+      }
+
+      async function loadArtifact(id) {
+        selectedId = id;
+        const artifact = await api.getArtifact(id);
+        renderArtifact(artifact);
+        await refreshArtifacts();
+      }
+
+      function renderArtifact(artifact) {
+        document.getElementById('artifact-status').innerHTML = statusPill(artifact.status);
+        document.getElementById('artifact-summary').innerHTML = `
+          <div><strong>ID:</strong> <span class="mono">${escapeHtml(artifact.experiment_id)}</span></div>
+          <div><strong>Created:</strong> ${escapeHtml(artifact.created_at)}</div>
+          <div><strong>Completed:</strong> ${escapeHtml(artifact.completed_at)}</div>
+          <div><strong>Mode:</strong> ${escapeHtml(artifact.config?.backend_profile)}</div>
+          <div><strong>Input:</strong> ${escapeHtml(artifact.input?.user_input)}</div>
+        `;
+
+        document.getElementById('stage1-output').innerHTML = artifact.stage1_responses.map((item) => renderStageCard(item.model_id, item.response, item)).join('');
+        document.getElementById('stage2-output').innerHTML = artifact.stage2_reviews.map((item) => {
+          const ranking = item.parsed_ranking?.length ? `<pre>${escapeHtml(item.parsed_ranking.join('\\n'))}</pre>` : '';
+          return renderStageCard(item.reviewer_model_id, item.raw_review_text, item, ranking);
+        }).join('');
+        document.getElementById('aggregate-output').innerHTML = renderAggregate(artifact.aggregate_rankings);
+        document.getElementById('stage3-output').innerHTML = renderStageCard(artifact.stage3_synthesis.model_id, artifact.stage3_synthesis.response, artifact.stage3_synthesis);
+      }
+
+      function renderStageCard(model, text, item, extra = '') {
+        const failed = item.status === 'error';
+        const body = failed
+          ? `<pre>${escapeHtml(item.error_type)}: ${escapeHtml(item.error_message)}</pre>`
+          : `<pre>${escapeHtml(text)}</pre>`;
+        return `
+          <div class="card ${failed ? 'error-panel' : ''}">
+            <h3>${escapeHtml(model)}</h3>
+            <div>${statusPill(item.status)} <span class="subtle">${escapeHtml(item.latency_ms)} ms</span></div>
+            ${body}
+            ${extra}
+          </div>
+        `;
+      }
+
+      function renderAggregate(items) {
+        if (!items || !items.length) return '<div class="subtle">No aggregate rankings.</div>';
+        return `
+          <table>
+            <thead><tr><th>Model</th><th>Average Rank</th><th>Count</th><th>Valid</th></tr></thead>
+            <tbody>
+              ${items.map((item) => `
+                <tr>
+                  <td>${escapeHtml(item.model_id)}</td>
+                  <td>${escapeHtml(item.average_rank)}</td>
+                  <td>${escapeHtml(item.rankings_count)}</td>
+                  <td>${escapeHtml(item.valid)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      }
+
+      document.getElementById('run-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const button = document.getElementById('run-button');
+        const message = document.getElementById('run-message');
+        button.disabled = true;
+        message.textContent = 'Running experiment...';
+        try {
+          const result = await api.createExperiment({
+            mode: document.getElementById('mode').value,
+            input: document.getElementById('prompt').value,
+            stage1_models: csv(document.getElementById('stage1').value),
+            stage2_reviewers: csv(document.getElementById('stage2').value),
+            chairman: document.getElementById('chairman').value.trim(),
+          });
+          message.textContent = `Artifact written: ${result.experiment_id} (${result.status})`;
+          await loadArtifact(result.experiment_id);
+        } catch (error) {
+          message.textContent = `Error: ${error.message}`;
+        } finally {
+          button.disabled = false;
+        }
+      });
+
+      document.getElementById('refresh').addEventListener('click', refreshArtifacts);
+      refreshArtifacts().catch((error) => {
+        document.getElementById('artifact-list').innerHTML = `<div class="card error-panel">${escapeHtml(error.message)}</div>`;
+      });
+    </script>
+  </body>
+</html>

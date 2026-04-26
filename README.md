@@ -92,6 +92,108 @@ Prohibido para esta ruta:
 
 Referencia operativa: `docs/operations/operational_state.md`.
 
+## llm_lab (Experimental Layer)
+
+`runtime_lab/llm_lab/` es una capa experimental para ejecutar comparaciones
+deterministas entre modelos locales y guardar artefactos auditables.
+
+Propósito:
+
+- experimentación multi-modelo fuera del runtime principal
+- ejecución local con modelos disponibles vía Ollama
+- conservación de resultados como artefactos JSON versionados
+- validación explícita de errores, rankings y síntesis
+
+No forma parte de NUCLEO core. No llama a `AgentService`, `AgentRuntime`,
+`Planner`, `PolicyEngine`, `ToolRegistry`, `Tools` ni `AgentResponse`.
+
+Componentes principales:
+
+- `runtime_lab/llm_lab/experiment_runner.py`
+- `runtime_lab/llm_lab/experiment_artifact.py`
+- `runtime_lab/llm_lab/experiment_validator.py`
+- `runtime_lab/docs/llm_lab_experiment_artifact_contract.md`
+
+Los experimentos producen:
+
+```text
+runtime_lab/llm_lab/artifacts/{experiment_id}.json
+```
+
+Los artefactos generados no se versionan salvo `.gitkeep`.
+
+### Running experiments
+
+Mock determinista con errores explícitos:
+
+```bash
+python runtime_lab/llm_lab/experiment_runner.py \
+  --mode mock \
+  --input "Compara inferencia local y remota en fase HARDENING"
+```
+
+Mock determinista exitoso:
+
+```bash
+python runtime_lab/llm_lab/experiment_runner.py \
+  --mode mock-success \
+  --input "Resume el objetivo de un artefacto auditable"
+```
+
+Ollama local, si `qwen` y `mistral` están disponibles:
+
+```bash
+python runtime_lab/llm_lab/experiment_runner.py \
+  --mode ollama \
+  --stage1-models qwen,mistral \
+  --stage2-reviewers qwen,mistral \
+  --chairman qwen \
+  --input "Explica el contrato de artefactos de llm_lab"
+```
+
+### llm_lab UI
+
+`runtime_lab/llm_lab_ui/` contiene una UI local opcional para lanzar
+experimentos y visualizar artefactos.
+
+La UI:
+
+- interactúa solo con `runtime_lab/llm_lab`
+- lee artefactos desde `runtime_lab/llm_lab/artifacts/`
+- no llama al runtime de NUCLEO
+- no ejecuta tools
+- no decide política
+- no integra proveedores externos
+
+Arranque local:
+
+```bash
+python -m uvicorn runtime_lab.llm_lab_ui.backend.main:app \
+  --host 127.0.0.1 \
+  --port 8765
+```
+
+Abrir:
+
+```text
+http://127.0.0.1:8765/
+```
+
+Referencia: `runtime_lab/docs/llm_lab_ui_interaction.md`.
+
+### External audits
+
+`external/` se usa solo como área de investigación y auditoría externa.
+
+Referencias auditadas:
+
+- `external/shimmy`: candidato externo de backend de inferencia.
+- `external/llm-council`: referencia conceptual para orquestación de
+  experimentos multi-modelo en `llm_lab`.
+
+Estas referencias no forman parte del runtime de NUCLEO y no deben ser usadas
+como dependencias del core. Los informes se guardan bajo `runtime_lab/audit/`.
+
 ### No implementado todavía
 
 - Integración real con LLM para planificación

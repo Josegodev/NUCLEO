@@ -207,3 +207,53 @@ Lo que no hace:
 - no llama a `AgentRuntime`
 - no invoca `Planner`, `PolicyEngine`, `ToolRegistry` ni `Tools`
 - no llama a `/agent/run`
+
+## Artefactos de experimentos multi-modelo
+
+`experiment_runner.py` genera artefactos JSON versionados bajo:
+
+```text
+runtime_lab/llm_lab/artifacts/{experiment_id}.json
+```
+
+Contrato:
+
+```text
+runtime_lab/docs/llm_lab_experiment_artifact_contract.md
+```
+
+Ejecutar mock determinista. Este modo no llama a Ollama y escribe dos
+artefactos: uno valido y uno con errores registrados explicitamente.
+
+```bash
+.venv/bin/python runtime_lab/llm_lab/experiment_runner.py \
+  --mode mock \
+  --input "Compara inferencia local y remota en fase HARDENING"
+```
+
+Ejecutar solo mock exitoso:
+
+```bash
+.venv/bin/python runtime_lab/llm_lab/experiment_runner.py \
+  --mode mock-success \
+  --input "Resume el objetivo de un artefacto auditable"
+```
+
+Ejecutar con Ollama local, si `qwen` y `mistral` estan disponibles:
+
+```bash
+.venv/bin/python runtime_lab/llm_lab/experiment_runner.py \
+  --mode ollama \
+  --stage1-models qwen,mistral \
+  --stage2-reviewers qwen,mistral \
+  --chairman qwen \
+  --input "Explica el contrato de artefactos de llm_lab"
+```
+
+Restricciones:
+
+- este runner pertenece solo a `runtime_lab/llm_lab`
+- no llama al runtime de NUCLEO
+- no ejecuta tools
+- no decide politica
+- no introduce proveedores externos
