@@ -1,5 +1,5 @@
 > Archivo origen: `docs/operations/session_log.md`
-> Última sincronización: `2026-04-19`
+> Última sincronización: `2026-04-26`
 
 # Session log
 
@@ -115,3 +115,92 @@
 - Se añadieron:
   - `docs/audits/documentation_consistency_audit.md`
   - `docs/operations/session_log_docs_normalization.md`
+
+## 2026-04-23
+
+- Se recuperó la línea base del sistema después de rollback.
+- Se identificaron issues críticos:
+  - `PolicyDecision` no estaba cerrado
+  - riesgo de drift entre Policy y Registry
+  - falta de runner determinista
+- Se entró en fase HARDENING:
+  - contratos
+  - determinismo
+
+## 2026-04-25
+
+- Se añadió trazabilidad interna mínima del runtime:
+  - `ExecutionTrace`
+  - `ExecutionStep`
+  - `Tracer`
+  - `InMemoryTracer`
+- Se integró tracing en `AgentRuntime` para:
+  - resultado del planner
+  - decisión de policy
+  - resolución de registry
+  - ejecución de tool o salto por dry-run
+- Se mantuvo la traza interna fuera del contrato público `AgentResponse`.
+- Se reforzó `dry_run=True` como comportamiento sin ejecución real, manteniendo
+  el paso previsto de tool como `skipped` en la traza.
+- Se añadió cobertura unittest para:
+  - ejecución permitida
+  - ejecución denegada
+  - dry-run
+  - tool desconocida
+  - error de tool
+  - fallo de tracer
+  - contrato de respuesta API
+- Se endureció el contrato del planner:
+  - se añadió `PlannedAction` tipado
+  - se redujeron los estados del planner a `planned` y `no_plan`
+  - `no_plan` quedó como resultado válido sin ejecución
+  - el runtime se detiene antes de policy si el output del planner no es válido
+  - el runtime valida `ToolRegistry` antes de autorizar mediante policy
+
+## 2026-04-26 - Runtime Audit UI y CORS local
+
+- Se añadió una Runtime Audit UI estática mínima en:
+  - `runtime_lab/runtime_audit_ui/frontend/index.html`
+  - `runtime_lab/runtime_audit_ui/README.md`
+- Se mantuvo la UI como verificador del contrato HTTP:
+  - llama a `POST /agent/run`
+  - llama a `GET /tools`
+  - llama a `GET /health`
+  - muestra el JSON completo del backend
+  - no decide tools
+  - no evalúa policy
+  - no modifica la ejecución del runtime
+  - no llama a `runtime_lab/llm_lab`
+- Se añadió `GET /health` como alias de la ruta de salud existente.
+- Se añadió CORS solo para desarrollo local en `app/main.py` para los origins:
+  - `http://127.0.0.1:8766`
+  - `http://127.0.0.1:8767`
+  - `http://localhost:8766`
+  - `http://localhost:8767`
+- Métodos CORS permitidos:
+  - `GET`
+  - `POST`
+  - `OPTIONS`
+- Headers CORS permitidos:
+  - `Authorization`
+  - `Content-Type`
+- Se preservaron los límites de arquitectura:
+  - sin cambios en `AgentService`
+  - sin cambios en `AgentRuntime`
+  - sin cambios en `Planner`
+  - sin cambios en `PolicyEngine`
+  - sin cambios en `ToolRegistry`
+  - sin cambios en tools
+  - sin cambios en `AgentResponse`
+- Se documentó la carencia de trazabilidad pública:
+  - `AgentResponse` no expone `request_id` top-level
+  - cualquier request ID dentro de `result` depende de cada tool y no está
+    garantizado por el contrato público
+- Se validó:
+  - compilación Python de archivos FastAPI modificados
+  - descubrimiento unittest
+  - peticiones `OPTIONS` equivalentes a preflight de navegador desde
+    `http://127.0.0.1:8767`
+  - `GET /health`
+  - `GET /tools`
+  - `POST /agent/run` con `dry_run=true`

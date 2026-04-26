@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NUCLEO Runtime Audit</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5f6f7;
+        --panel: #ffffff;
+        --text: #1f252b;
+        --muted: #66717d;
+        --line: #d8dde3;
+        --accent: #205c63;
+        --accent-soft: #e5f1f2;
+        --ok: #276749;
+        --warn: #936514;
+        --error: #a33a2f;
+        --code: #f0f3f5;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      header {
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+        padding: 14px 20px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 2px;
+        font-size: 20px;
+        line-height: 1.2;
+      }
+
+      h2 {
+        margin-bottom: 12px;
+        font-size: 16px;
+      }
+
+      h3 {
+        margin-bottom: 8px;
+        font-size: 14px;
+      }
+
+      main {
+        display: grid;
+        grid-template-columns: 380px minmax(0, 1fr);
+        gap: 16px;
+        padding: 16px;
+      }
+
+      section,
+      aside {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 14px;
+      }
+
+      .stack {
+        display: grid;
+        gap: 16px;
+      }
+
+      label {
+        display: block;
+        margin: 12px 0 6px;
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      input,
+      textarea,
+      button {
+        font: inherit;
+      }
+
+      input,
+      textarea {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #fff;
+        color: var(--text);
+        padding: 9px 10px;
+      }
+
+      textarea {
+        min-height: 130px;
+        resize: vertical;
+      }
+
+      button {
+        border: 1px solid var(--accent);
+        border-radius: 6px;
+        background: var(--accent);
+        color: #fff;
+        cursor: pointer;
+        padding: 9px 12px;
+      }
+
+      button.secondary {
+        background: #fff;
+        color: var(--accent);
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      .button-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .button-row.single {
+        grid-template-columns: 1fr;
+      }
+
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .toggle-row input {
+        width: auto;
+      }
+
+      .toggle-row label {
+        margin: 0;
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .summary-item {
+        min-height: 76px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fff;
+        padding: 10px;
+      }
+
+      .summary-label {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      .summary-value {
+        display: block;
+        margin-top: 6px;
+        overflow-wrap: anywhere;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+      }
+
+      .summary-value.ok {
+        color: var(--ok);
+      }
+
+      .summary-value.warn {
+        color: var(--warn);
+      }
+
+      .summary-value.error {
+        color: var(--error);
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .toolbar button {
+        width: auto;
+      }
+
+      .tools-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .tool-row {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px;
+      }
+
+      .tool-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 6px;
+      }
+
+      .pill {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--accent-soft);
+        padding: 2px 8px;
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      pre {
+        min-height: 140px;
+        margin: 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--code);
+        padding: 12px;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+      }
+
+      .muted {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .error-box {
+        border-left: 4px solid var(--error);
+      }
+
+      @media (max-width: 960px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+
+        .summary-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 560px) {
+        main {
+          padding: 10px;
+        }
+
+        .summary-grid,
+        .button-row {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>NUCLEO Runtime Audit</h1>
+      <div class="muted">Request -> FastAPI -> AgentService -> AgentRuntime -> Planner -> PolicyEngine -> ToolRegistry -> Tool -> AgentResponse</div>
+    </header>
+
+    <main>
+      <aside>
+        <h2>Runtime Request</h2>
+
+        <label for="api-base">API base URL</label>
+        <input id="api-base" value="http://127.0.0.1:8000" autocomplete="off" />
+
+        <label for="api-key">Bearer API key</label>
+        <input id="api-key" value="dev-jose-key" autocomplete="off" />
+
+        <label for="user-input">user_input</label>
+        <textarea id="user-input">system info</textarea>
+
+        <div class="toggle-row">
+          <input id="dry-run" type="checkbox" checked />
+          <label for="dry-run">dry_run</label>
+        </div>
+
+        <div class="button-row single">
+          <button id="run-agent" type="button">POST /agent/run</button>
+        </div>
+
+        <div class="button-row">
+          <button id="load-tools" class="secondary" type="button">GET /tools</button>
+          <button id="check-health" class="secondary" type="button">GET /health</button>
+        </div>
+
+        <p id="transport-state" class="muted"></p>
+      </aside>
+
+      <div class="stack">
+        <section>
+          <h2>AgentResponse Highlights</h2>
+          <div class="summary-grid">
+            <div class="summary-item">
+              <span class="summary-label">status</span>
+              <span id="highlight-status" class="summary-value">-</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">message</span>
+              <span id="highlight-message" class="summary-value">-</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">request_id</span>
+              <span id="highlight-request-id" class="summary-value">not exposed</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">result</span>
+              <span id="highlight-result" class="summary-value">-</span>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <div class="toolbar">
+            <h2>Full JSON</h2>
+            <button id="clear-output" class="secondary" type="button">Clear</button>
+          </div>
+          <pre id="json-output">{}</pre>
+        </section>
+
+        <section>
+          <div class="toolbar">
+            <h2>Registered Tools</h2>
+            <span id="tools-count" class="muted">not loaded</span>
+          </div>
+          <div id="tools-output" class="tools-list"></div>
+        </section>
+
+        <section>
+          <h2>Health</h2>
+          <pre id="health-output">{}</pre>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const nodes = {
+        apiBase: document.getElementById('api-base'),
+        apiKey: document.getElementById('api-key'),
+        userInput: document.getElementById('user-input'),
+        dryRun: document.getElementById('dry-run'),
+        runAgent: document.getElementById('run-agent'),
+        loadTools: document.getElementById('load-tools'),
+        checkHealth: document.getElementById('check-health'),
+        transportState: document.getElementById('transport-state'),
+        status: document.getElementById('highlight-status'),
+        message: document.getElementById('highlight-message'),
+        requestId: document.getElementById('highlight-request-id'),
+        result: document.getElementById('highlight-result'),
+        jsonOutput: document.getElementById('json-output'),
+        toolsOutput: document.getElementById('tools-output'),
+        toolsCount: document.getElementById('tools-count'),
+        healthOutput: document.getElementById('health-output'),
+        clearOutput: document.getElementById('clear-output'),
+      };
+
+      function apiBase() {
+        return nodes.apiBase.value.trim().replace(/\/+$/, '');
+      }
+
+      function bearerHeaders() {
+        const key = nodes.apiKey.value.trim();
+        return key ? { Authorization: `Bearer ${key}` } : {};
+      }
+
+      function asJson(value) {
+        return JSON.stringify(value, null, 2);
+      }
+
+      async function readBody(response) {
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          return response.json();
+        }
+        return response.text();
+      }
+
+      async function requestJson(path, options = {}) {
+        const response = await fetch(`${apiBase()}${path}`, {
+          ...options,
+          headers: {
+            ...bearerHeaders(),
+            ...(options.headers || {}),
+          },
+        });
+        const body = await readBody(response);
+
+        return {
+          ok: response.ok,
+          http_status: response.status,
+          http_status_text: response.statusText,
+          body,
+        };
+      }
+
+      function summarizeResult(result) {
+        if (result === undefined || result === null) return '-';
+        if (typeof result === 'object') return asJson(result);
+        return String(result);
+      }
+
+      function findRequestId(value) {
+        if (!value || typeof value !== 'object') return null;
+        if (typeof value.request_id === 'string') return value.request_id;
+        if (value.result && typeof value.result === 'object' && typeof value.result.request_id === 'string') {
+          return value.result.request_id;
+        }
+        return null;
+      }
+
+      function statusClass(status) {
+        if (!status) return '';
+        if (String(status).includes('success') || status === 'ok') return 'ok';
+        if (status === 'blocked' || status === 'no_plan') return 'warn';
+        return 'error';
+      }
+
+      function setSummary(responseBody) {
+        const status = responseBody && typeof responseBody === 'object' ? responseBody.status : undefined;
+        const message = responseBody && typeof responseBody === 'object' ? responseBody.message : undefined;
+        const result = responseBody && typeof responseBody === 'object' ? responseBody.result : undefined;
+        const requestId = findRequestId(responseBody);
+
+        nodes.status.textContent = status ?? '-';
+        nodes.status.className = `summary-value ${statusClass(status)}`;
+        nodes.message.textContent = message ?? '-';
+        nodes.requestId.textContent = requestId ?? 'not exposed';
+        nodes.result.textContent = summarizeResult(result);
+      }
+
+      function renderEnvelope(envelope, target) {
+        target.textContent = asJson(envelope);
+        target.classList.toggle('error-box', !envelope.ok);
+      }
+
+      function renderTools(envelope) {
+        nodes.toolsOutput.textContent = '';
+        nodes.toolsCount.textContent = envelope.ok && Array.isArray(envelope.body)
+          ? `${envelope.body.length} tool(s)`
+          : `HTTP ${envelope.http_status}`;
+
+        if (!envelope.ok || !Array.isArray(envelope.body)) {
+          const pre = document.createElement('pre');
+          pre.className = 'error-box';
+          pre.textContent = asJson(envelope);
+          nodes.toolsOutput.appendChild(pre);
+          return;
+        }
+
+        for (const tool of envelope.body) {
+          const row = document.createElement('div');
+          row.className = 'tool-row';
+
+          const title = document.createElement('h3');
+          title.textContent = tool.name ?? '(unnamed tool)';
+
+          const description = document.createElement('div');
+          description.className = 'muted';
+          description.textContent = tool.description ?? '';
+
+          const meta = document.createElement('div');
+          meta.className = 'tool-meta';
+          for (const value of [`read_only: ${tool.read_only}`, `risk: ${tool.risk_level}`]) {
+            const pill = document.createElement('span');
+            pill.className = 'pill';
+            pill.textContent = value;
+            meta.appendChild(pill);
+          }
+
+          row.append(title, description, meta);
+          nodes.toolsOutput.appendChild(row);
+        }
+      }
+
+      async function withBusy(button, label, task) {
+        button.disabled = true;
+        nodes.transportState.textContent = label;
+        try {
+          await task();
+        } catch (error) {
+          const envelope = {
+            ok: false,
+            error_type: 'network_error',
+            message: error instanceof Error ? error.message : String(error),
+          };
+          renderEnvelope(envelope, nodes.jsonOutput);
+          setSummary(envelope);
+        } finally {
+          button.disabled = false;
+          nodes.transportState.textContent = '';
+        }
+      }
+
+      nodes.runAgent.addEventListener('click', () => withBusy(nodes.runAgent, 'Calling /agent/run...', async () => {
+        const envelope = await requestJson('/agent/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_input: nodes.userInput.value,
+            dry_run: nodes.dryRun.checked,
+          }),
+        });
+        renderEnvelope(envelope, nodes.jsonOutput);
+        setSummary(envelope.body);
+      }));
+
+      nodes.loadTools.addEventListener('click', () => withBusy(nodes.loadTools, 'Calling /tools...', async () => {
+        const envelope = await requestJson('/tools');
+        renderTools(envelope);
+      }));
+
+      nodes.checkHealth.addEventListener('click', () => withBusy(nodes.checkHealth, 'Calling /health...', async () => {
+        const envelope = await requestJson('/health');
+        renderEnvelope(envelope, nodes.healthOutput);
+      }));
+
+      nodes.clearOutput.addEventListener('click', () => {
+        nodes.jsonOutput.textContent = '{}';
+        nodes.jsonOutput.classList.remove('error-box');
+        setSummary({});
+      });
+    </script>
+  </body>
+</html>

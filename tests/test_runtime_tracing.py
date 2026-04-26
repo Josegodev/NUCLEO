@@ -1,5 +1,7 @@
 import unittest
 
+from fastapi.middleware.cors import CORSMiddleware
+
 from app.api.routes.agent import run_agent
 from app.main import app
 from app.policies.engine import PolicyEngine
@@ -211,6 +213,27 @@ class RuntimeTracingTests(unittest.TestCase):
         fields = set(AgentResponse.model_fields)
 
         self.assertEqual(fields, {"status", "message", "result"})
+
+    def test_health_alias_route_is_registered(self) -> None:
+        paths = {route.path for route in app.routes}
+
+        self.assertIn("/", paths)
+        self.assertIn("/health", paths)
+
+    def test_runtime_audit_ui_cors_is_local_only(self) -> None:
+        cors = next(middleware for middleware in app.user_middleware if middleware.cls is CORSMiddleware)
+
+        self.assertEqual(
+            cors.kwargs["allow_origins"],
+            [
+                "http://127.0.0.1:8766",
+                "http://127.0.0.1:8767",
+                "http://localhost:8766",
+                "http://localhost:8767",
+            ],
+        )
+        self.assertEqual(cors.kwargs["allow_methods"], ["GET", "POST", "OPTIONS"])
+        self.assertEqual(cors.kwargs["allow_headers"], ["Authorization", "Content-Type"])
 
     def test_policy_denies_registered_tool_not_in_explicit_allowlist(self) -> None:
         decision = PolicyEngine(tool_registry=StaticRegistry(SpyTool())).evaluate(

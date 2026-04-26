@@ -43,6 +43,7 @@ Request
 - Endpoint `POST /agent/run`
 - Endpoint `GET /tools`
 - Endpoint `GET /`
+- Endpoint `GET /health`
 - Autenticación por API key por request
 - `ExecutionContext` propagado por runtime, policy y tools
 - Tools de producción:
@@ -180,6 +181,63 @@ http://127.0.0.1:8765/
 ```
 
 Referencia: `runtime_lab/docs/llm_lab_ui_interaction.md`.
+
+### Runtime Audit UI (Local Dev)
+
+`runtime_lab/runtime_audit_ui/` contiene una consola estática mínima para
+verificar el contrato HTTP del runtime de NUCLEO desde navegador.
+
+La UI:
+
+- llama a `POST /agent/run`
+- llama a `GET /tools`
+- llama a `GET /health`
+- muestra la respuesta completa como JSON
+- no decide tools
+- no evalúa policy
+- no modifica el runtime
+- no integra LLMs
+- no llama a `runtime_lab/llm_lab`
+
+Arranque local recomendado:
+
+```bash
+.venv/bin/python -m uvicorn app.main:app \
+  --host 127.0.0.1 \
+  --port 8001
+```
+
+```bash
+.venv/bin/python -m http.server 8767 \
+  --directory runtime_lab/runtime_audit_ui/frontend
+```
+
+Abrir:
+
+```text
+http://127.0.0.1:8767/
+```
+
+En la UI, configurar `API base URL` como:
+
+```text
+http://127.0.0.1:8001
+```
+
+El CORS local para esta consola está declarado en `app/main.py` y permite solo:
+
+- `http://127.0.0.1:8766`
+- `http://127.0.0.1:8767`
+- `http://localhost:8766`
+- `http://localhost:8767`
+
+Métodos permitidos: `GET`, `POST`, `OPTIONS`.
+
+Headers permitidos: `Authorization`, `Content-Type`.
+
+Nota de trazabilidad: `AgentResponse` no expone actualmente un `request_id`
+top-level. Algunas tools pueden incluirlo dentro de `result`, pero no es parte
+garantizada del contrato público.
 
 ### External audits
 
