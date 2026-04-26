@@ -108,11 +108,22 @@ Prerequisites:
 
 - Ollama is running locally.
 - The existing `llm_lab` local models are available.
+- Confirm installed model names with:
+
+```bash
+ollama list
+```
+
+Use exact model names from `ollama list` when needed. Ollama commonly exposes
+tagged names such as `mistral:latest`.
 
 Known local model IDs accepted by the UI:
 
 - `qwen`
+- `qwen2.5-coder:7b`
 - `mistral`
+- `mistral:latest`
+- `llama3.1`
 - `llama3.1:8b`
 
 In the UI:
@@ -147,6 +158,13 @@ The UI accepts the same comma-separated model list:
 
 ```text
 qwen,mistral,llama3.1:8b
+```
+
+Exact tagged names are also valid when they appear in `ollama list`, for
+example:
+
+```text
+qwen2.5-coder:7b,mistral:latest,llama3.1:8b
 ```
 
 Example:

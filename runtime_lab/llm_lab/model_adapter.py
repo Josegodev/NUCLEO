@@ -16,9 +16,12 @@ AdapterMode = Literal["mock_success", "mock_errors", "ollama"]
 OLLAMA_URL = "http://localhost:11434/api/chat"
 OLLAMA_TAGS_URL = "http://localhost:11434/api/tags"
 OLLAMA_MODEL_ALIASES = {
-    "qwen": "qwen2.5-coder:7b",
-    "mistral": "mistral",
-    "llama3.1:8b": "llama3.1:8b",
+    "qwen": ("qwen2.5-coder:7b",),
+    "qwen2.5-coder:7b": ("qwen2.5-coder:7b",),
+    "mistral": ("mistral:latest", "mistral"),
+    "mistral:latest": ("mistral:latest",),
+    "llama3.1": ("llama3.1:8b",),
+    "llama3.1:8b": ("llama3.1:8b",),
 }
 
 
@@ -135,7 +138,9 @@ def _labels_from_prompt(prompt: str) -> list[str]:
 
 def _call_ollama_lab_model(model_id: str, prompt: str, *, timeout_ms: int) -> str:
     """Call local Ollama through one deterministic llm_lab adapter path."""
-    ollama_model = _resolve_ollama_model(model_id)
+    timeout_seconds = max(timeout_ms / 1000, 1)
+    available_models = _fetch_available_ollama_models(timeout_seconds=timeout_seconds)
+    ollama_model = _resolve_ollama_model(model_id, available_models)
     messages = [
         {
             "role": "system",
@@ -147,8 +152,6 @@ def _call_ollama_lab_model(model_id: str, prompt: str, *, timeout_ms: int) -> st
         },
         {"role": "user", "content": prompt},
     ]
-    timeout_seconds = max(timeout_ms / 1000, 1)
-    _ensure_ollama_model_available(ollama_model, timeout_seconds=timeout_seconds)
     response = requests.post(
         OLLAMA_URL,
         json={"model": ollama_model, "messages": messages, "stream": False},
@@ -160,14 +163,19 @@ def _call_ollama_lab_model(model_id: str, prompt: str, *, timeout_ms: int) -> st
     return _extract_ollama_answer(response)
 
 
-def _resolve_ollama_model(model_id: str) -> str:
-    try:
-        return OLLAMA_MODEL_ALIASES[model_id]
-    except KeyError as exc:
-        raise ModelNotAvailableError(f"Unsupported llm_lab Ollama model: {model_id}") from exc
+def _resolve_ollama_model(model_id: str, available_models: set[str]) -> str:
+    requested = model_id.strip()
+    if requested in available_models:
+        return requested
+
+    for candidate in OLLAMA_MODEL_ALIASES.get(requested, ()):
+        if candidate in available_models:
+            return candidate
+
+    raise ModelNotAvailableError(f"Ollama model is not installed or supported: {model_id}")
 
 
-def _ensure_ollama_model_available(ollama_model: str, *, timeout_seconds: float) -> None:
+def _fetch_available_ollama_models(*, timeout_seconds: float) -> set[str]:
     response = requests.get(OLLAMA_TAGS_URL, timeout=timeout_seconds)
     response.raise_for_status()
     try:
@@ -179,13 +187,11 @@ def _ensure_ollama_model_available(ollama_model: str, *, timeout_seconds: float)
     if not isinstance(models, list):
         raise MalformedResponseError("Ollama model list response did not contain a models list.")
 
-    available = {
+    return {
         item.get("name")
         for item in models
         if isinstance(item, dict) and isinstance(item.get("name"), str)
     }
-    if ollama_model not in available:
-        raise ModelNotAvailableError(f"Ollama model is not installed: {ollama_model}")
 
 
 def _extract_ollama_answer(response: requests.Response) -> str:

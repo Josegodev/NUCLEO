@@ -241,6 +241,14 @@ Ejecutar solo mock exitoso:
 
 Ejecutar con Ollama local, si `qwen`, `mistral` y `llama3.1:8b` estan disponibles:
 
+Comprueba primero los nombres reales instalados:
+
+```bash
+ollama list
+```
+
+El runner acepta nombres con tag, por ejemplo `mistral:latest`.
+
 ```bash
 .venv/bin/python runtime_lab/llm_lab/experiment_runner.py \
   --mode ollama \
