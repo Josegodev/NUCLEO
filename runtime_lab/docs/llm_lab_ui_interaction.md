@@ -113,6 +113,7 @@ Known local model IDs accepted by the UI:
 
 - `qwen`
 - `mistral`
+- `llama3.1:8b`
 
 In the UI:
 
@@ -120,13 +121,13 @@ In the UI:
 2. Set Stage 1 models, for example:
 
 ```text
-qwen,mistral
+qwen,mistral,llama3.1:8b
 ```
 
 3. Set Stage 2 reviewers, for example:
 
 ```text
-qwen,mistral
+qwen,mistral,llama3.1:8b
 ```
 
 4. Set chairman:
@@ -136,6 +137,36 @@ qwen
 ```
 
 5. Click `Run`.
+
+## Using Multiple Local Models
+
+The experiment runner treats all selected local models through the same
+Ollama adapter path. No model is privileged by the artifact contract.
+
+The UI accepts the same comma-separated model list:
+
+```text
+qwen,mistral,llama3.1:8b
+```
+
+Example:
+
+```bash
+python runtime_lab/llm_lab/experiment_runner.py \
+  --mode ollama \
+  --stage1-models qwen,mistral,llama3.1:8b \
+  --stage2-reviewers qwen,mistral,llama3.1:8b \
+  --chairman qwen \
+  --input "Compare the role of deterministic artifacts in llm_lab."
+```
+
+Behavior:
+
+- every Stage 1 model call is recorded;
+- every Stage 2 reviewer call is recorded;
+- failures are stored explicitly with `status=error`;
+- empty output is not treated as success;
+- malformed rankings are not treated as success.
 
 ## API Endpoints
 
@@ -152,8 +183,8 @@ POST /api/experiments
 {
   "mode": "mock",
   "input": "Compare local and remote inference.",
-  "stage1_models": ["qwen", "mistral"],
-  "stage2_reviewers": ["qwen", "mistral"],
+  "stage1_models": ["qwen", "mistral", "llama3.1:8b"],
+  "stage2_reviewers": ["qwen", "mistral", "llama3.1:8b"],
   "chairman": "qwen"
 }
 ```
@@ -208,6 +239,7 @@ are ignored by list operations.
 - No artifact editing.
 - `mock` mode intentionally creates an artifact with explicit errors.
 - `mock-success` creates a successful artifact.
-- `ollama` mode is limited to `qwen` and `mistral`.
+- `ollama` mode is limited to the local model IDs explicitly allowed by
+  `runtime_lab/llm_lab/model_adapter.py`.
 - Ollama availability is not managed by the UI.
 - Existing old artifacts that do not satisfy the current validator may fail to load.

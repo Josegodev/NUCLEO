@@ -26,6 +26,9 @@ from model_adapter import AdapterMode, call_model
 
 LAB_DIR = Path(__file__).resolve().parent
 ARTIFACTS_DIR = LAB_DIR / "artifacts"
+MOCK_SUCCESS_MODELS = ["mock/qwen", "mock/mistral", "mock/llama3.1:8b"]
+MOCK_ERROR_STAGE1_MODELS = ["mock/qwen", "mock/mistral-unavailable", "mock/llama3.1:8b-empty"]
+MOCK_ERROR_REVIEWERS = ["mock/qwen", "mock/llama3.1:8b-bad-ranking"]
 
 
 def run_experiment(
@@ -367,8 +370,8 @@ def run_mock_pair(user_input: str, timeout_ms: int) -> list[Path]:
     return [
         run_experiment(
             user_input=user_input,
-            stage1_responders=["mock/model-a", "mock/model-b", "mock/model-c"],
-            stage2_reviewers=["mock/model-a", "mock/model-b", "mock/model-c"],
+            stage1_responders=MOCK_SUCCESS_MODELS,
+            stage2_reviewers=MOCK_SUCCESS_MODELS,
             stage3_chairman="mock/chairman",
             adapter_mode="mock_success",
             config=success_config,
@@ -376,8 +379,8 @@ def run_mock_pair(user_input: str, timeout_ms: int) -> list[Path]:
         ),
         run_experiment(
             user_input=user_input,
-            stage1_responders=["mock/model-a", "mock/model-unavailable", "mock/model-empty"],
-            stage2_reviewers=["mock/model-a", "mock/model-bad-ranking"],
+            stage1_responders=MOCK_ERROR_STAGE1_MODELS,
+            stage2_reviewers=MOCK_ERROR_REVIEWERS,
             stage3_chairman="mock/chairman-empty",
             adapter_mode="mock_errors",
             config=errors_config,
@@ -397,12 +400,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--stage1-models",
-        default="qwen,mistral",
+        default="qwen,mistral,llama3.1:8b",
         help="Comma-separated Stage 1 model IDs for ollama mode.",
     )
     parser.add_argument(
         "--stage2-reviewers",
-        default="qwen,mistral",
+        default="qwen,mistral,llama3.1:8b",
         help="Comma-separated Stage 2 reviewer model IDs for ollama mode.",
     )
     parser.add_argument(
@@ -421,8 +424,8 @@ def main() -> None:
             lambda: [
                 run_experiment(
                     user_input=args.input,
-                    stage1_responders=["mock/model-a", "mock/model-b", "mock/model-c"],
-                    stage2_reviewers=["mock/model-a", "mock/model-b", "mock/model-c"],
+                    stage1_responders=MOCK_SUCCESS_MODELS,
+                    stage2_reviewers=MOCK_SUCCESS_MODELS,
                     stage3_chairman="mock/chairman",
                     adapter_mode="mock_success",
                     config=config,
@@ -436,8 +439,8 @@ def main() -> None:
             lambda: [
                 run_experiment(
                     user_input=args.input,
-                    stage1_responders=["mock/model-a", "mock/model-unavailable", "mock/model-empty"],
-                    stage2_reviewers=["mock/model-a", "mock/model-bad-ranking"],
+                    stage1_responders=MOCK_ERROR_STAGE1_MODELS,
+                    stage2_reviewers=MOCK_ERROR_REVIEWERS,
                     stage3_chairman="mock/chairman-empty",
                     adapter_mode="mock_errors",
                     config=config,

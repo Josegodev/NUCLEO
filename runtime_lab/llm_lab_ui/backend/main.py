@@ -27,10 +27,12 @@ if str(LLM_LAB_DIR) not in sys.path:
 
 from experiment_runner import default_config, run_experiment  # noqa: E402
 from experiment_validator import ArtifactValidationError, validate_artifact  # noqa: E402
+from model_adapter import OLLAMA_MODEL_ALIASES  # noqa: E402
 
 
 ALLOWED_MODES = {"mock", "mock-success", "ollama"}
-ALLOWED_LOCAL_MODELS = {"qwen", "mistral"}
+ALLOWED_LOCAL_MODELS = set(OLLAMA_MODEL_ALIASES)
+DEFAULT_LOCAL_MODELS = ["qwen", "mistral", "llama3.1:8b"]
 MOCK_SUCCESS_MODELS = ["mock/model-a", "mock/model-b", "mock/model-c"]
 MOCK_ERROR_STAGE1 = ["mock/model-a", "mock/model-unavailable", "mock/model-empty"]
 MOCK_ERROR_REVIEWERS = ["mock/model-a", "mock/model-bad-ranking"]
@@ -50,8 +52,8 @@ app.add_middleware(
 class ExperimentRequest(BaseModel):
     mode: Literal["mock", "mock-success", "ollama"]
     input: str = Field(min_length=1)
-    stage1_models: list[str] = Field(default_factory=lambda: ["qwen", "mistral"])
-    stage2_reviewers: list[str] = Field(default_factory=lambda: ["qwen", "mistral"])
+    stage1_models: list[str] = Field(default_factory=lambda: list(DEFAULT_LOCAL_MODELS))
+    stage2_reviewers: list[str] = Field(default_factory=lambda: list(DEFAULT_LOCAL_MODELS))
     chairman: str = "qwen"
 
     @field_validator("input")
@@ -80,7 +82,8 @@ class ExperimentRequest(BaseModel):
     def chairman_must_be_known(cls, value: str) -> str:
         value = value.strip()
         if value not in ALLOWED_LOCAL_MODELS:
-            raise ValueError("chairman must be qwen or mistral")
+            allowed = ", ".join(sorted(ALLOWED_LOCAL_MODELS))
+            raise ValueError(f"chairman must be one of: {allowed}")
         return value
 
 

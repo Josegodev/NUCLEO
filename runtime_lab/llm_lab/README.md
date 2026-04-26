@@ -239,13 +239,13 @@ Ejecutar solo mock exitoso:
   --input "Resume el objetivo de un artefacto auditable"
 ```
 
-Ejecutar con Ollama local, si `qwen` y `mistral` estan disponibles:
+Ejecutar con Ollama local, si `qwen`, `mistral` y `llama3.1:8b` estan disponibles:
 
 ```bash
 .venv/bin/python runtime_lab/llm_lab/experiment_runner.py \
   --mode ollama \
-  --stage1-models qwen,mistral \
-  --stage2-reviewers qwen,mistral \
+  --stage1-models qwen,mistral,llama3.1:8b \
+  --stage2-reviewers qwen,mistral,llama3.1:8b \
   --chairman qwen \
   --input "Explica el contrato de artefactos de llm_lab"
 ```

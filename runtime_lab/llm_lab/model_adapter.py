@@ -13,6 +13,13 @@ import requests
 
 
 AdapterMode = Literal["mock_success", "mock_errors", "ollama"]
+OLLAMA_URL = "http://localhost:11434/api/chat"
+OLLAMA_TAGS_URL = "http://localhost:11434/api/tags"
+OLLAMA_MODEL_ALIASES = {
+    "qwen": "qwen2.5-coder:7b",
+    "mistral": "mistral",
+    "llama3.1:8b": "llama3.1:8b",
+}
 
 
 @dataclass(frozen=True)
@@ -127,30 +134,72 @@ def _labels_from_prompt(prompt: str) -> list[str]:
 
 
 def _call_ollama_lab_model(model_id: str, prompt: str, *, timeout_ms: int) -> str:
-    """Call existing llm_lab local Ollama scripts without importing NUCLEO core."""
-    if model_id == "qwen":
-        from qwen import chat_qwen_sqlite as chat
-    elif model_id == "mistral":
-        from mistral import chat_mistral_sqlite as chat
-    else:
-        raise ModelNotAvailableError(
-            f"Unsupported llm_lab Ollama model '{model_id}'. Supported: qwen, mistral."
-        )
-
-    # Reuse existing prompt/context/response validation logic, but avoid writing
-    # experiment prompts into chat memory by not calling chat.ask().
-    chat.init_db()
-    user_context = chat.load_user_context()
-    history = chat.get_messages()
-    messages = chat.build_prompt(user_context, history, prompt)
+    """Call local Ollama through one deterministic llm_lab adapter path."""
+    ollama_model = _resolve_ollama_model(model_id)
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are running inside runtime_lab/llm_lab. "
+                "Answer only the current experiment prompt. "
+                "Do not assume access to NUCLEO Runtime, tools, or policy."
+            ),
+        },
+        {"role": "user", "content": prompt},
+    ]
     timeout_seconds = max(timeout_ms / 1000, 1)
-    response = chat.requests.post(
-        chat.OLLAMA_URL,
-        json={"model": chat.MODEL, "messages": messages, "stream": False},
+    _ensure_ollama_model_available(ollama_model, timeout_seconds=timeout_seconds)
+    response = requests.post(
+        OLLAMA_URL,
+        json={"model": ollama_model, "messages": messages, "stream": False},
         timeout=timeout_seconds,
     )
+    if response.status_code == 404:
+        raise ModelNotAvailableError("Ollama model was not found.")
+    response.raise_for_status()
+    return _extract_ollama_answer(response)
+
+
+def _resolve_ollama_model(model_id: str) -> str:
+    try:
+        return OLLAMA_MODEL_ALIASES[model_id]
+    except KeyError as exc:
+        raise ModelNotAvailableError(f"Unsupported llm_lab Ollama model: {model_id}") from exc
+
+
+def _ensure_ollama_model_available(ollama_model: str, *, timeout_seconds: float) -> None:
+    response = requests.get(OLLAMA_TAGS_URL, timeout=timeout_seconds)
     response.raise_for_status()
     try:
-        return chat.extract_answer(response)
-    except RuntimeError as exc:
-        raise MalformedResponseError("Ollama response did not match expected chat shape.") from exc
+        payload = response.json()
+    except ValueError as exc:
+        raise MalformedResponseError("Ollama model list response was not valid JSON.") from exc
+
+    models = payload.get("models")
+    if not isinstance(models, list):
+        raise MalformedResponseError("Ollama model list response did not contain a models list.")
+
+    available = {
+        item.get("name")
+        for item in models
+        if isinstance(item, dict) and isinstance(item.get("name"), str)
+    }
+    if ollama_model not in available:
+        raise ModelNotAvailableError(f"Ollama model is not installed: {ollama_model}")
+
+
+def _extract_ollama_answer(response: requests.Response) -> str:
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        raise MalformedResponseError("Ollama response was not valid JSON.") from exc
+
+    message = payload.get("message")
+    if not isinstance(message, dict):
+        raise MalformedResponseError("Ollama response did not contain a message object.")
+
+    content = message.get("content")
+    if not isinstance(content, str):
+        raise MalformedResponseError("Ollama response message did not contain string content.")
+
+    return content.strip()
