@@ -10,10 +10,17 @@ __pycache__/
 *.tmp
 *.tmp.json
 *.jsonl
+!runtime_lab/document_loader/fixtures/*.jsonl
+runtime_lab/document_loader/pdf/
 
 # llm_lab generated artifacts
 runtime_lab/llm_lab/artifacts/*
 !runtime_lab/llm_lab/artifacts/.gitkeep
+
+# document_loader generated knowledge artifacts
+runtime_lab/knowledge_store/documents/
+runtime_lab/knowledge_store/manifests/
+runtime_lab/knowledge_store/llm_context/
 
 # External research repositories
 external/*
@@ -31,3 +38,4 @@ Thumbs.db
 
 # Local scratch files
 estructura.txt
+external/

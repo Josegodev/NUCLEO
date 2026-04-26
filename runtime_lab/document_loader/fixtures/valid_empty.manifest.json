@@ -1,0 +1,10 @@
+{
+  "document_id": null,
+  "errors": [],
+  "output_context_md": null,
+  "output_jsonl": "runtime_lab/document_loader/fixtures/valid_empty.jsonl",
+  "parser_status": "no parser integrated",
+  "records_written": 0,
+  "source_hash": null,
+  "source_path": "/tmp/fixture.pdf"
+}
