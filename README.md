@@ -2,6 +2,42 @@
 
 NUCLEO es un runtime de agentes modulares construido sobre FastAPI. Su objetivo es ejecutar peticiones de usuario mediante un pipeline controlado y auditable, evitando comportamientos opacos y separando con claridad decisión, validación y ejecución.
 
+## Qué hace (en 30 segundos)
+
+NUCLEO permite automatizar tareas sobre datos reales de forma controlada.
+
+Ejemplo real:
+
+- Input: datos de producción con errores (CSV incompletos, valores ambiguos)
+- Proceso: validación estructural + decisión controlada
+- Output: datos limpios y agregados listos para uso operativo
+
+### Ejemplo
+
+Input:caja_1,caja_2,caja_3
+5,,8
+,, 
+10,6,x
+
+Output:
+Trabajador A → 13 kg
+Errores detectados → 2 filas inválidas
+
+Esto evita ejecutar acciones sobre datos incorrectos y permite automatizar procesos manteniendo control total sobre la ejecución.
+
+## Uso de IA (controlado)
+
+NUCLEO está diseñado para integrar modelos de lenguaje (LLMs) sin perder control del sistema.
+
+Uso actual:
+
+- interpretación de valores ambiguos
+- limpieza de datos no estructurados
+- asistencia en validación
+
+El modelo nunca ejecuta directamente acciones:
+todas pasan por validación explícita en el runtime.
+
 ## Estado documental
 
 La documentación del repositorio sigue esta convención:
