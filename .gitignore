@@ -43,3 +43,6 @@ external/
 runtime_lab/recoleccion/data/
 runtime_lab/recoleccion/outputs/
 *.csv
+runtime_lab/recoleccion/data/
+runtime_lab/recoleccion/outputs/
+*.csv
