@@ -39,3 +39,7 @@ Thumbs.db
 # Local scratch files
 estructura.txt
 external/
+
+runtime_lab/recoleccion/data/
+runtime_lab/recoleccion/outputs/
+*.csv
