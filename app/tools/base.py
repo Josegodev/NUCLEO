@@ -10,6 +10,12 @@ Contrato:
 """
 
 from app.schemas.context import ExecutionContext
+from app.schemas.artifacts import (
+    StructuredData,
+    ToolContractArtifact,
+    validate_tool_output,
+    validate_tool_payload,
+)
 
 
 class BaseTool:
@@ -17,6 +23,13 @@ class BaseTool:
     description: str
     read_only: bool
     risk_level: str
+    contract: ToolContractArtifact
+
+    def validate_input(self, payload: dict | None = None) -> StructuredData:
+        return validate_tool_payload(self.name, payload or {})
+
+    def validate_output(self, output: dict) -> StructuredData:
+        return validate_tool_output(self.name, output)
 
     def run(self, payload: dict, context: ExecutionContext | None = None) -> dict:
         raise NotImplementedError

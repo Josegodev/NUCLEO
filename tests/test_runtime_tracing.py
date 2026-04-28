@@ -5,14 +5,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.agent import run_agent
 from app.main import app
 from app.policies.engine import PolicyEngine
-from app.policies.models import PolicyDecision
+from app.policies.models import (
+    PolicyDecision,
+    PolicyDecisionValue,
+    PolicyValidatedField,
+)
 from app.runtime.orchestrator import AgentRuntime
 from app.runtime.planner import Planner
 from app.runtime.tracing import InMemoryTracer
 from app.schemas.context import ExecutionContext
 from app.schemas.execution import PlannedAction
 from app.schemas.requests import AgentRequest
-from app.schemas.responses import AgentResponse
+from app.schemas.responses import AgentResponse, ExecutionErrorCode, ExecutionStatus
+from app.tools.base import BaseTool
 
 
 class StaticPlanner:
@@ -24,23 +29,32 @@ class StaticPlanner:
 
 
 class StaticPolicyEngine:
-    def __init__(self, decision: str = "allow", reason: str = "test") -> None:
+    def __init__(
+        self,
+        decision: PolicyDecisionValue = PolicyDecisionValue.ALLOW,
+        reason: str = "test",
+    ) -> None:
         self._decision = decision
         self._reason = reason
         self.calls = 0
 
     def evaluate(self, tool_name: str, payload: dict, dry_run: bool, context: ExecutionContext) -> PolicyDecision:
         self.calls += 1
-        return PolicyDecision(decision=self._decision, reason=self._reason)
+        return PolicyDecision(
+            decision=self._decision,
+            reason=self._reason,
+            validated_fields=[PolicyValidatedField.TOOL_NAME],
+        )
 
 
-class SpyTool:
-    name = "spy"
+class SpyTool(BaseTool):
+    name = "echo"
     description = "Test spy tool."
     read_only = True
     risk_level = "low"
 
-    def __init__(self, fail: bool = False) -> None:
+    def __init__(self, name: str = "echo", fail: bool = False) -> None:
+        self.name = name
         self.calls = 0
         self.fail = fail
 
@@ -48,7 +62,11 @@ class SpyTool:
         self.calls += 1
         if self.fail:
             raise RuntimeError("tool failed")
-        return {"ok": True, "payload": payload}
+        return {
+            "echo": payload,
+            "requested_by": context.username if context else None,
+            "request_id": context.request_id if context else None,
+        }
 
 
 class StaticRegistry:
@@ -90,12 +108,13 @@ def tracer() -> InMemoryTracer:
 
 
 def planned_action(tool_name: str, payload: dict | None = None) -> PlannedAction:
+    default_payload = {"text": "hello"} if tool_name == "echo" else {}
     return PlannedAction(
         tool_name=tool_name,
-        payload=payload or {},
+        payload=payload if payload is not None else default_payload,
         status="planned",
         reason="test plan",
-        source="test",
+        source="explicit_request",
         confidence=1.0,
     )
 
@@ -105,8 +124,11 @@ class RuntimeTracingTests(unittest.TestCase):
         tool = SpyTool()
         runtime_tracer = tracer()
         runtime = AgentRuntime(
-            runtime_planner=StaticPlanner(planned_action("spy", {"x": 1})),
-            runtime_policy_engine=StaticPolicyEngine("allow", "allowed"),
+            runtime_planner=StaticPlanner(planned_action("echo", {"text": "hello"})),
+            runtime_policy_engine=StaticPolicyEngine(
+                PolicyDecisionValue.ALLOW,
+                "allowed",
+            ),
             tool_registry=StaticRegistry(tool),
             runtime_tracer=runtime_tracer,
         )
@@ -123,8 +145,11 @@ class RuntimeTracingTests(unittest.TestCase):
         tool = SpyTool()
         runtime_tracer = tracer()
         runtime = AgentRuntime(
-            runtime_planner=StaticPlanner(planned_action("spy")),
-            runtime_policy_engine=StaticPolicyEngine("deny", "blocked by test"),
+            runtime_planner=StaticPlanner(planned_action("echo")),
+            runtime_policy_engine=StaticPolicyEngine(
+                PolicyDecisionValue.DENY,
+                "blocked by test",
+            ),
             tool_registry=StaticRegistry(tool),
             runtime_tracer=runtime_tracer,
         )
@@ -132,18 +157,20 @@ class RuntimeTracingTests(unittest.TestCase):
         response = runtime.run(AgentRequest(dry_run=False), context())
         trace = runtime_tracer.get_trace("trace-req-1")
 
-        self.assertEqual(response.status, "blocked")
+        self.assertEqual(response.status, ExecutionStatus.REJECTED)
         self.assertEqual(tool.calls, 0)
         self.assertEqual([step.phase for step in trace.steps], ["planner", "policy"])
         self.assertEqual(trace.steps[1].status, "denied")
 
     def test_dry_run_with_system_info_records_registry_and_skipped_tool(self) -> None:
-        tool = SpyTool()
-        tool.name = "system_info"
+        tool = SpyTool(name="system_info")
         runtime_tracer = tracer()
         runtime = AgentRuntime(
             runtime_planner=StaticPlanner(planned_action("system_info")),
-            runtime_policy_engine=StaticPolicyEngine("allow", "allowed"),
+            runtime_policy_engine=StaticPolicyEngine(
+                PolicyDecisionValue.ALLOW,
+                "allowed",
+            ),
             tool_registry=StaticRegistry(tool),
             runtime_tracer=runtime_tracer,
         )
@@ -151,68 +178,60 @@ class RuntimeTracingTests(unittest.TestCase):
         response = runtime.run(AgentRequest(user_input="system info", dry_run=True), context())
         trace = runtime_tracer.get_trace("trace-req-1")
 
-        self.assertEqual(response.status, "dry_run_success")
+        self.assertEqual(response.status, ExecutionStatus.SUCCESS)
         self.assertEqual(tool.calls, 0)
         self.assertEqual([step.phase for step in trace.steps], ["planner", "policy", "registry", "tool"])
         self.assertEqual(trace.steps[3].status, "skipped")
         self.assertEqual(trace.steps[3].output["executed"], False)
         self.assertEqual(trace.steps[3].output["reason"], "dry_run")
 
-    def test_unknown_tool_proposed_by_planner_is_blocked_by_policy(self) -> None:
-        runtime_tracer = tracer()
-        policy_engine = StaticPolicyEngine("deny", "tool 'missing' is not allowed by policy")
-        runtime = AgentRuntime(
-            runtime_planner=StaticPlanner(planned_action("missing")),
-            runtime_policy_engine=policy_engine,
-            tool_registry=StaticRegistry(None),
-            runtime_tracer=runtime_tracer,
-        )
-
-        response = runtime.run(AgentRequest(dry_run=False), context())
-        trace = runtime_tracer.get_trace("trace-req-1")
-
-        self.assertEqual(response.status, "blocked")
-        self.assertEqual(policy_engine.calls, 1)
-        self.assertEqual([step.phase for step in trace.steps], ["planner", "policy"])
-        self.assertEqual(trace.steps[1].status, "denied")
-        self.assertIn("not allowed by policy", trace.steps[1].error)
+    def test_action_artifact_rejects_unknown_tool_name(self) -> None:
+        with self.assertRaises(ValueError):
+            planned_action("missing")
 
     def test_tracer_failure_does_not_execute_denied_tool(self) -> None:
         tool = SpyTool()
         runtime = AgentRuntime(
-            runtime_planner=StaticPlanner(planned_action("spy")),
-            runtime_policy_engine=StaticPolicyEngine("deny", "blocked by test"),
+            runtime_planner=StaticPlanner(planned_action("echo")),
+            runtime_policy_engine=StaticPolicyEngine(
+                PolicyDecisionValue.DENY,
+                "blocked by test",
+            ),
             tool_registry=StaticRegistry(tool),
             runtime_tracer=FailingTracer(),
         )
 
         response = runtime.run(AgentRequest(dry_run=False), context())
 
-        self.assertEqual(response.status, "blocked")
+        self.assertEqual(response.status, ExecutionStatus.REJECTED)
         self.assertEqual(tool.calls, 0)
 
     def test_tool_error_is_traced_and_propagated(self) -> None:
         tool = SpyTool(fail=True)
         runtime_tracer = tracer()
         runtime = AgentRuntime(
-            runtime_planner=StaticPlanner(planned_action("spy")),
-            runtime_policy_engine=StaticPolicyEngine("allow", "allowed"),
+            runtime_planner=StaticPlanner(planned_action("echo")),
+            runtime_policy_engine=StaticPolicyEngine(
+                PolicyDecisionValue.ALLOW,
+                "allowed",
+            ),
             tool_registry=StaticRegistry(tool),
             runtime_tracer=runtime_tracer,
         )
 
-        with self.assertRaises(RuntimeError):
-            runtime.run(AgentRequest(dry_run=False), context())
+        response = runtime.run(AgentRequest(dry_run=False), context())
 
         trace = runtime_tracer.get_trace("trace-req-1")
+        self.assertEqual(response.status, ExecutionStatus.ERROR)
+        self.assertEqual(response.errors[0].code, ExecutionErrorCode.TOOL_EXECUTION_FAILED)
         self.assertEqual(trace.steps[3].phase, "tool")
         self.assertEqual(trace.steps[3].status, "error")
         self.assertEqual(trace.steps[3].error, "tool failed")
 
-    def test_api_response_contract_does_not_gain_trace_id(self) -> None:
+    def test_api_response_contract_is_execution_result_artifact(self) -> None:
         fields = set(AgentResponse.model_fields)
 
-        self.assertEqual(fields, {"status", "message", "result"})
+        self.assertEqual(fields, {"status", "result", "errors", "trace_id", "version"})
 
     def test_health_alias_route_is_registered(self) -> None:
         paths = {route.path for route in app.routes}
@@ -233,17 +252,20 @@ class RuntimeTracingTests(unittest.TestCase):
             ],
         )
         self.assertEqual(cors.kwargs["allow_methods"], ["GET", "POST", "OPTIONS"])
-        self.assertEqual(cors.kwargs["allow_headers"], ["Authorization", "Content-Type"])
+        self.assertEqual(
+            cors.kwargs["allow_headers"],
+            ["Authorization", "Content-Type", "X-Idempotency-Key"],
+        )
 
     def test_policy_denies_registered_tool_not_in_explicit_allowlist(self) -> None:
-        decision = PolicyEngine(tool_registry=StaticRegistry(SpyTool())).evaluate(
+        decision = PolicyEngine(tool_registry=StaticRegistry(SpyTool(name="spy"))).evaluate(
             tool_name="spy",
             payload={},
             dry_run=True,
             context=context(),
         )
 
-        self.assertEqual(decision.decision, "deny")
+        self.assertEqual(decision.decision, PolicyDecisionValue.DENY)
         self.assertIn("not allowed by policy", decision.reason)
 
     def test_policy_allows_disk_info_for_authenticated_context(self) -> None:
@@ -254,11 +276,40 @@ class RuntimeTracingTests(unittest.TestCase):
             context=context(),
         )
 
-        self.assertEqual(decision.decision, "allow")
+        self.assertEqual(decision.decision, PolicyDecisionValue.ALLOW)
 
     def test_policy_decision_rejects_unknown_decision_value(self) -> None:
         with self.assertRaises(ValueError):
-            PolicyDecision(decision="unknown", reason="invalid policy result")
+            PolicyDecision(
+                decision="unknown",
+                reason="invalid policy result",
+                validated_fields=[PolicyValidatedField.TOOL_NAME],
+            )
+
+    def test_policy_decision_rejects_string_decision_value(self) -> None:
+        with self.assertRaises(ValueError):
+            PolicyDecision(
+                decision="allow",
+                reason="string decision must not be accepted",
+                validated_fields=[PolicyValidatedField.TOOL_NAME],
+            )
+
+    def test_policy_decision_rejects_invalid_validated_field(self) -> None:
+        with self.assertRaises(ValueError):
+            PolicyDecision(
+                decision=PolicyDecisionValue.ALLOW,
+                reason="invalid validated field",
+                validated_fields=["tool_name"],
+            )
+
+    def test_policy_decision_rejects_extra_field(self) -> None:
+        with self.assertRaises(ValueError):
+            PolicyDecision(
+                decision=PolicyDecisionValue.ALLOW,
+                reason="extra field must not be accepted",
+                validated_fields=[PolicyValidatedField.TOOL_NAME],
+                unexpected=True,
+            )
 
     def test_known_input_returns_expected_planner_result(self) -> None:
         result = Planner().create_plan(AgentRequest(user_input="system info", dry_run=True))
@@ -275,7 +326,7 @@ class RuntimeTracingTests(unittest.TestCase):
         self.assertIn("No deterministic planner rule", result.reason)
 
         tool = SpyTool()
-        policy_engine = StaticPolicyEngine("allow", "allowed")
+        policy_engine = StaticPolicyEngine(PolicyDecisionValue.ALLOW, "allowed")
         runtime = AgentRuntime(
             runtime_planner=StaticPlanner(result),
             runtime_policy_engine=policy_engine,
@@ -284,7 +335,8 @@ class RuntimeTracingTests(unittest.TestCase):
         )
         response = runtime.run(AgentRequest(dry_run=False), context())
 
-        self.assertEqual(response.status, "no_plan")
+        self.assertEqual(response.status, ExecutionStatus.REJECTED)
+        self.assertEqual(response.errors[0].code, ExecutionErrorCode.NO_PLAN)
         self.assertEqual(policy_engine.calls, 0)
         self.assertEqual(tool.calls, 0)
 
@@ -307,7 +359,7 @@ class RuntimeTracingTests(unittest.TestCase):
 
     def test_runtime_stops_before_policy_when_planner_result_is_invalid(self) -> None:
         tool = SpyTool()
-        policy_engine = StaticPolicyEngine("allow", "allowed")
+        policy_engine = StaticPolicyEngine(PolicyDecisionValue.ALLOW, "allowed")
         runtime = AgentRuntime(
             runtime_planner=StaticPlanner({"tool": "spy", "payload": {}}),
             runtime_policy_engine=policy_engine,
@@ -317,7 +369,28 @@ class RuntimeTracingTests(unittest.TestCase):
 
         response = runtime.run(AgentRequest(dry_run=False), context())
 
-        self.assertEqual(response.status, "error")
+        self.assertEqual(response.status, ExecutionStatus.ERROR)
+        self.assertEqual(response.errors[0].code, ExecutionErrorCode.PLANNER_INVALID_RESULT)
+        self.assertEqual(policy_engine.calls, 0)
+        self.assertEqual(tool.calls, 0)
+
+    def test_invalid_explicit_payload_is_rejected_before_policy(self) -> None:
+        tool = SpyTool()
+        policy_engine = StaticPolicyEngine(PolicyDecisionValue.ALLOW, "allowed")
+        runtime = AgentRuntime(
+            runtime_planner=Planner(),
+            runtime_policy_engine=policy_engine,
+            tool_registry=StaticRegistry(tool),
+            runtime_tracer=tracer(),
+        )
+
+        response = runtime.run(
+            AgentRequest(tool="echo", payload={}, dry_run=False),
+            context(),
+        )
+
+        self.assertEqual(response.status, ExecutionStatus.REJECTED)
+        self.assertEqual(response.errors[0].code, ExecutionErrorCode.TOOL_INPUT_INVALID)
         self.assertEqual(policy_engine.calls, 0)
         self.assertEqual(tool.calls, 0)
 
@@ -341,7 +414,7 @@ class RuntimeTracingTests(unittest.TestCase):
         )
 
         self.assertEqual(route.status_code, None)
-        self.assertEqual(response.status, "dry_run_success")
+        self.assertEqual(response.status, ExecutionStatus.SUCCESS)
         self.assertEqual(response.result["executed"], False)
         self.assertEqual(response.result["tool"], "system_info")
 

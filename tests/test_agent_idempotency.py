@@ -6,6 +6,7 @@ from app.api.routes import agent as agent_route
 from app.schemas.context import ExecutionContext
 from app.schemas.requests import AgentRequest
 from app.schemas.responses import AgentResponse
+from app.schemas.responses import ExecutionStatus
 
 
 class CountingAgentService:
@@ -17,13 +18,13 @@ class CountingAgentService:
         self.calls += 1
         self.contexts.append(context)
         return AgentResponse(
-            status="success",
-            message=f"call-{self.calls}",
+            status=ExecutionStatus.SUCCESS,
             result={
                 "calls": self.calls,
                 "dry_run": request.dry_run,
                 "idempotency_key": context.idempotency_key,
             },
+            trace_id=f"trace-call-{self.calls}",
         )
 
 
@@ -74,8 +75,8 @@ class AgentRunIdempotencyTests(unittest.TestCase):
         )
 
         self.assertEqual(service.calls, 2)
-        self.assertEqual(first_response.message, "call-1")
-        self.assertEqual(second_response.message, "call-2")
+        self.assertEqual(first_response.result["calls"], 1)
+        self.assertEqual(second_response.result["calls"], 2)
         self.assertIsNone(service.contexts[0].idempotency_key)
 
     def test_with_idempotency_key_first_request_executes_once(self) -> None:
@@ -111,7 +112,7 @@ class AgentRunIdempotencyTests(unittest.TestCase):
 
         self.assertEqual(service.calls, 1)
         self.assertEqual(first_response.model_dump(), second_response.model_dump())
-        self.assertEqual(second_response.message, "call-1")
+        self.assertEqual(second_response.result["calls"], 1)
 
     def test_idempotency_preserves_dry_run_determinism(self) -> None:
         first_response = agent_route.run_agent(
@@ -126,7 +127,7 @@ class AgentRunIdempotencyTests(unittest.TestCase):
         )
 
         self.assertEqual(first_response.model_dump(), second_response.model_dump())
-        self.assertEqual(first_response.status, "dry_run_success")
+        self.assertEqual(first_response.status, ExecutionStatus.SUCCESS)
         self.assertEqual(first_response.result["executed"], False)
         self.assertEqual(first_response.result["tool"], "system_info")
 

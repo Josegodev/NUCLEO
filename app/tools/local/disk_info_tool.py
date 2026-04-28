@@ -3,6 +3,14 @@ import platform
 import shutil
 
 from app.schemas.context import ExecutionContext
+from app.schemas.artifacts import (
+    DiskInfoOutput,
+    DiskInfoPayload,
+    ToolContractArtifact,
+    ToolPostcondition,
+    ToolPrecondition,
+    ToolSideEffect,
+)
 from app.tools.base import BaseTool
 
 
@@ -27,6 +35,20 @@ class DiskInfoTool(BaseTool):
     description = "Returns disk usage information for a path or mount point."
     read_only = True
     risk_level = "low"
+    contract = ToolContractArtifact(
+        name="disk_info",
+        input_schema=DiskInfoPayload.model_json_schema(),
+        output_schema=DiskInfoOutput.model_json_schema(),
+        preconditions=[
+            ToolPrecondition.AUTHENTICATED_CONTEXT,
+            ToolPrecondition.PAYLOAD_VALIDATED,
+        ],
+        postconditions=[
+            ToolPostcondition.STRUCTURED_OUTPUT,
+            ToolPostcondition.OUTPUT_SCHEMA_VALIDATED,
+        ],
+        side_effects=[ToolSideEffect.READ_DISK_USAGE],
+    )
 
     def run(self, payload: dict | None = None, context: ExecutionContext | None = None) -> dict:
         payload = payload or {}

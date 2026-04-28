@@ -2,6 +2,14 @@ import platform
 import socket
 
 from app.schemas.context import ExecutionContext
+from app.schemas.artifacts import (
+    SystemInfoOutput,
+    SystemInfoPayload,
+    ToolContractArtifact,
+    ToolPostcondition,
+    ToolPrecondition,
+    ToolSideEffect,
+)
 from app.tools.base import BaseTool
 
 
@@ -10,6 +18,20 @@ class SystemInfoTool(BaseTool):
     description = "Returns basic information about the local system."
     read_only = True
     risk_level = "low"
+    contract = ToolContractArtifact(
+        name="system_info",
+        input_schema=SystemInfoPayload.model_json_schema(),
+        output_schema=SystemInfoOutput.model_json_schema(),
+        preconditions=[
+            ToolPrecondition.AUTHENTICATED_CONTEXT,
+            ToolPrecondition.PAYLOAD_VALIDATED,
+        ],
+        postconditions=[
+            ToolPostcondition.STRUCTURED_OUTPUT,
+            ToolPostcondition.OUTPUT_SCHEMA_VALIDATED,
+        ],
+        side_effects=[ToolSideEffect.READ_SYSTEM_METADATA],
+    )
 
     def run(self, payload: dict, context: ExecutionContext | None = None) -> dict:
         return {

@@ -15,6 +15,7 @@ def list_tools():
             "description": tool.description,
             "read_only": tool.read_only,
             "risk_level": tool.risk_level,
+            "contract": tool.contract.model_dump(mode="json"),
         }
         for tool in tools
     ]
