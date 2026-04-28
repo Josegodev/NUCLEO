@@ -15,19 +15,33 @@ Central execution orchestrator of the production runtime.
 1. starts an internal in-memory execution trace
 2. asks the planner for a `PlannedAction`
 3. records the planner step
-4. validates that the planner returned `PlannedAction`
-5. if the plan is `no_plan`, returns a controlled `no_plan` response
+4. validates that the planner returned a versioned `PlannedAction`
+5. if the plan is `no_plan`, returns a structured `rejected` response
 6. otherwise extracts candidate `tool_name` and `payload`
 7. asks `PolicyEngine` for authorization
 8. records the policy step
-9. if denied, returns `blocked`
+9. if denied, returns structured `rejected`
 10. resolves the tool from production `ToolRegistry`
 11. records the registry step
-12. if missing, records the registry step as `error` and returns `error`
+12. if missing, records the registry step as `error` and returns structured `error`
 13. if `dry_run=True`, records a tool step as `skipped` with `executed=False` and does not run the tool
 14. otherwise executes `tool.run(payload, context=context)`
-15. records success or error for the tool step
-16. returns `AgentResponse`
+15. validates the tool output against the selected tool contract
+16. records success or error for the tool step
+17. returns `AgentResponse`
+
+The runtime executes a tool only after a valid action artifact and
+`PolicyDecisionValue.ALLOW`. `dry_run=True` never calls `tool.run(...)`.
+
+Public `AgentResponse.status` is closed to:
+
+- `success`
+- `error`
+- `rejected`
+
+Breaking change: `AgentResponse.message` is no longer part of the public
+contract. The execution-result artifact uses `status`, `result`, `errors`,
+`trace_id`, and `version`.
 
 ## Internal Trace Contract
 
@@ -64,10 +78,9 @@ tool error.
 ## Current Limitations
 
 - Runtime composition still happens at import time
-- Limited exception handling
-- Response still duplicates data between `message` and `result`
+- Runtime trace remains in-memory only
 
 ## Status Label
 
 - Production path: implemented
-- Full contract hardening: not implemented
+- Artifact contract hardening: implemented for current production tools

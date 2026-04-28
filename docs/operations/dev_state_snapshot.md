@@ -6,7 +6,7 @@
 
 ## Current HARDENING Addendum
 
-Updated on 2026-04-25 after `llm_lab` was added inside the repository.
+Updated on 2026-04-28 after artifact-contract hardening.
 
 This file still preserves the 2026-04-19 snapshot below as history. Current
 verified behavior is:
@@ -19,10 +19,17 @@ verified behavior is:
   - `system_info`
   - `disk_info`
 - Planner returns only `planned` or `no_plan`
+- `PlannedAction` is versioned and carries preconditions plus expected output
+- `PolicyDecision` is strict, enum-backed, and forbids extra fields
+- `PolicyValidatedField` is a closed enum
+- `ToolContractArtifact` is required for production tool registration
 - `dry_run=True` evaluates planner, policy, and registry, but does not call
   `Tool.run(...)`
 - runtime tracing is internal and in-memory only
-- `AgentResponse` exposes `status`, `message`, and optional `result`
+- `AgentResponse` exposes `status`, optional structured `result`, `errors`,
+  `trace_id`, and `version`
+- public execution statuses are closed to `success`, `error`, and `rejected`
+- breaking change: `message` is no longer the public response contract
 - `runtime_lab/llm_lab/` is a lateral experimental observation path only
 - Mistral/Qwen are not integrated with AgentService, Runtime, Planner,
   PolicyEngine, ToolRegistry, or Tools
@@ -52,8 +59,10 @@ Historical snapshot only. For current verified behavior, use `docs/operations/op
   - `disk_info`
 - response carries:
   - `status`
-  - `message`
   - `result` optional
+  - `errors`
+  - `trace_id`
+  - `version`
 
 ## Verified Experimental Additions
 
@@ -69,10 +78,12 @@ These additions are isolated from production registry activation.
 
 ## Historical Gaps At Snapshot Date
 
-- planner contract still implicit
+- planner contract was implicit at this historical snapshot date; current
+  behavior uses versioned `PlannedAction`
 - dry-run was not yet enforced structurally at this historical snapshot date;
   current behavior enforces it in `AgentRuntime`
-- runtime error model still limited
+- runtime error model was limited at this historical snapshot date; current
+  behavior returns structured execution-result artifacts
 - lab artifact persistence behavior depends on environment write permissions and has not been fully validated in this repository session
 
 ## Documentation Convention Snapshot

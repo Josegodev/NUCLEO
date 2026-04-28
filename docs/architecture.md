@@ -61,13 +61,13 @@ execution. This trace is not part of the public API response contract.
 - Resolves tools through production registry
 - Executes production tools
 - Records internal planner, policy, and tool steps through the runtime tracer
-- Returns `AgentResponse`
+- Returns a structured `AgentResponse` execution-result artifact
 
 ### Planner
 
 - Performs simple rule-based planning
 - Acts as a deterministic intent-to-candidate-action adapter
-- Returns a typed `PlannedAction`
+- Returns a typed and versioned `PlannedAction`
 - Does not authorize or execute tools
 - Can emit either:
   - `planned`
@@ -80,10 +80,13 @@ execution. This trace is not part of the public API response contract.
 - Allows `disk_info`
 - Allows `system_info` only for `admin`
 - Denies all other production tools by name
+- Returns strict `PolicyDecision` artifacts using `PolicyDecisionValue`
 
 ### ToolRegistry
 
-- Stores production tool instances in a dictionary
+- Stores production tool instances keyed by `tool.name`
+- Requires each registered tool to expose a `ToolContractArtifact`
+- Rejects duplicate names and tool names outside the closed production set
 - Resolves tools by `tool.name`
 - Is separate from staging and experimental registries
 
@@ -121,10 +124,20 @@ Currently registered at import time in the production runtime:
 Current runtime response model contains:
 
 - `status`
-- `message`
-- `result` optional
+- `result` optional structured data
+- `errors`
+- `trace_id`
+- `version`
 
-`message` is still populated with `str(result)` for backward compatibility.
+Breaking change: `message` is no longer part of the public response contract.
+The public execution-result contract is `status`, `result`, `errors`,
+`trace_id`, and `version`.
+
+Public `status` is closed to:
+
+- `success`
+- `error`
+- `rejected`
 
 ## Verified Current Contracts
 
@@ -138,6 +151,9 @@ Current fields:
 - `dry_run: bool = True`
 - `experimental_tool_generation: bool = False`
 
+The request may still carry a dictionary payload, but planned action payloads
+are validated against the selected tool contract before execution.
+
 ### Planner Output
 
 The planner returns `PlannedAction`.
@@ -147,9 +163,12 @@ Current fields:
 - `status`
 - `tool_name`
 - `payload`
+- `preconditions`
+- `expected_output`
 - `confidence`
 - `reason`
 - `source`
+- `version`
 
 `status` can be:
 
@@ -163,8 +182,14 @@ must not execute any tool.
 
 Current fields:
 
-- `decision`
+- `decision` (`PolicyDecisionValue.ALLOW` or `PolicyDecisionValue.DENY`)
 - `reason`
+- `validated_fields`
+- `version`
+
+`PolicyDecision` is strict: it uses `strict=True` and `extra="forbid"`.
+String decisions such as `"allow"` or `"deny"` are not accepted as valid
+contract input.
 
 ### Runtime Trace
 
@@ -208,12 +233,17 @@ Experimental generated tools are not auto-registered in the production
 ## Verified Constraints and Limitations
 
 - Planner output is typed as `PlannedAction` and runtime-validated
+- `PlannedAction` is versioned and carries preconditions plus expected output
+- `PolicyDecision` is strict and enum-backed
+- `ToolContractArtifact` is mandatory for production tool registration
+- Tool payload and output validation are explicit for registered tools
+- Runtime returns structured execution-result artifacts with closed public
+  statuses
 - `dry_run` is structurally enforced by the runtime: policy is evaluated, the
   tool step is traced, and the production tool is not executed
 - Policy is still largely name-based
 - Tool metadata such as `read_only` and `risk_level` are not yet enforced by policy
 - Production bootstrap still happens at module import time in `orchestrator.py`
-- Error handling in runtime is still limited
 
 ## Explicitly Not Verified
 

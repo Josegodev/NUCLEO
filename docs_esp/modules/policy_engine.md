@@ -1,5 +1,5 @@
 > Archivo origen: `docs/modules/policy_engine.md`
-> Última sincronización: `2026-04-25`
+> Última sincronización: `2026-04-28`
 
 # PolicyEngine
 
@@ -23,12 +23,20 @@ Validar si una ejecución planificada de una tool de producción está permitida
 
 Devuelve una `PolicyDecision` con:
 
-- `decision`
+- `decision`: `PolicyDecisionValue.ALLOW` o `PolicyDecisionValue.DENY`
 - `reason`
+- `validated_fields`
+- `version`
+
+`PolicyDecision` es estricto y rechaza entradas ambiguas:
+
+- `decision` debe ser un enum `PolicyDecisionValue`, no un string libre
+- `validated_fields` debe contener valores enum `PolicyValidatedField`
+- los campos desconocidos se rechazan con `extra="forbid"`
 
 ## Lo que actualmente no hace
 
-- no evalúa el payload en profundidad
+- valida la forma del payload contra el contrato de la tool seleccionada
 - no toma decisiones diferentes por `dry_run`; el runtime impone la no ejecución
 - no usa `read_only` ni `risk_level`
 - no gobierna directamente la generación de artefactos del laboratorio

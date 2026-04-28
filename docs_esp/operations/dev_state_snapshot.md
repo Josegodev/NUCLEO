@@ -1,5 +1,5 @@
 > Archivo origen: `docs/operations/dev_state_snapshot.md`
-> Última sincronización: `2026-04-25`
+> Última sincronización: `2026-04-28`
 
 # Snapshot del estado de desarrollo - NUCLEO
 
@@ -9,7 +9,7 @@
 
 ## Suplemento actual HARDENING
 
-Actualizado el 2026-04-25 tras incorporar `llm_lab` dentro del repositorio.
+Actualizado el 2026-04-28 tras endurecer los contratos de artefactos.
 
 Este archivo conserva debajo el snapshot del 2026-04-19 como historia. El
 comportamiento verificado actual es:
@@ -22,10 +22,18 @@ comportamiento verificado actual es:
   - `system_info`
   - `disk_info`
 - el Planner solo devuelve `planned` o `no_plan`
+- `PlannedAction` está versionado e incluye precondiciones y salida esperada
+- `PolicyDecision` es estricto, basado en enum y prohíbe campos extra
+- `PolicyValidatedField` es un enum cerrado
+- `ToolContractArtifact` es obligatorio para registrar tools de producción
 - `dry_run=True` evalúa planner, policy y registry, pero no llama a
   `Tool.run(...)`
 - la traza del runtime es interna y solo en memoria
-- `AgentResponse` expone `status`, `message` y `result` opcional
+- `AgentResponse` expone `status`, `result` estructurado opcional, `errors`,
+  `trace_id` y `version`
+- los estados públicos de ejecución están cerrados a `success`, `error` y
+  `rejected`
+- breaking change: `message` ya no es el contrato público de respuesta
 - `runtime_lab/llm_lab/` es solo una ruta lateral experimental de observación
 - Mistral/Qwen no están integrados con AgentService, Runtime, Planner,
   PolicyEngine, ToolRegistry ni Tools
@@ -55,8 +63,10 @@ Snapshot histórico solamente. Para el comportamiento verificado actual, usar `d
   - `disk_info`
 - la respuesta contiene:
   - `status`
-  - `message`
   - `result` opcional
+  - `errors`
+  - `trace_id`
+  - `version`
 
 ## Adiciones experimentales verificadas
 
@@ -72,10 +82,13 @@ Estas adiciones están aisladas de la activación del registry de producción.
 
 ## Gaps históricos en la fecha del snapshot
 
-- el contrato del planner sigue siendo implícito
+- el contrato del planner era implícito en la fecha histórica del snapshot; el
+  comportamiento actual usa `PlannedAction` versionado
 - dry-run aún no se imponía estructuralmente en la fecha histórica del
   snapshot; el comportamiento actual sí lo impone en `AgentRuntime`
-- el modelo de errores del runtime sigue siendo limitado
+- el modelo de errores del runtime era limitado en la fecha histórica del
+  snapshot; el comportamiento actual devuelve artefactos estructurados de
+  resultado de ejecución
 - el comportamiento de persistencia de artefactos del laboratorio depende de permisos de escritura del entorno y no se validó completamente en esta sesión del repositorio
 
 ## Snapshot de convención documental

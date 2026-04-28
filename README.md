@@ -69,7 +69,8 @@ Request
 - `ToolRegistry` es la fuente de verdad de tools ejecutables.
 - `PolicyEngine` autoriza la ejecución según autenticación, rol y nombre de tool.
 - `Tool` ejecuta la acción real.
-- `AgentResponse` devuelve `status`, `message` y `result` opcional.
+- `AgentResponse` devuelve un artefacto estructurado con `status`, `result`,
+  `errors`, `trace_id` y `version`.
 
 ## Estado actual del runtime
 
@@ -88,6 +89,12 @@ Request
   - `disk_info`
 - Resultado estructurado conservado en `AgentResponse.result`
 - Fase HARDENING en curso:
+  - contratos de artefactos explícitos para acción, policy, tools y resultado
+  - `PolicyDecision` estricto con enum y `extra="forbid"`
+  - `PlannedAction` versionado como artefacto de acción
+  - `ToolContractArtifact` obligatorio para registrar tools
+  - estados de ejecución cerrados: `success`, `error`, `rejected`
+  - `AgentResponse.message` eliminado como contrato público
   - contratos runtime-policy-registry más explícitos
   - Planner devuelve `planned` o `no_plan`
   - `no_plan` no ejecuta tools
@@ -271,9 +278,10 @@ Métodos permitidos: `GET`, `POST`, `OPTIONS`.
 
 Headers permitidos: `Authorization`, `Content-Type`.
 
-Nota de trazabilidad: `AgentResponse` no expone actualmente un `request_id`
-top-level. Algunas tools pueden incluirlo dentro de `result`, pero no es parte
-garantizada del contrato público.
+Nota de trazabilidad: `AgentResponse` expone `trace_id` como parte del contrato
+de resultado de ejecución. No expone `request_id` top-level; algunas tools
+pueden incluirlo dentro de `result`, pero no es parte garantizada del contrato
+público.
 
 ### External audits
 
@@ -352,16 +360,22 @@ curl -X POST http://127.0.0.1:8000/agent/run \
 
 ```json
 {
-  "status": "dry_run_success",
-  "message": "{'dry_run': True, 'executed': False, 'tool': 'system_info', 'payload': {}}",
+  "status": "success",
   "result": {
     "dry_run": true,
     "executed": false,
     "tool": "system_info",
     "payload": {}
-  }
+  },
+  "errors": [],
+  "trace_id": "trace-<request_id>",
+  "version": "execution_result.v1"
 }
 ```
+
+Breaking change: `AgentResponse.message` ya no es contrato público principal.
+El contrato estable es `status`, `result`, `errors`, `trace_id` y `version`.
+Los únicos estados públicos cerrados son `success`, `error` y `rejected`.
 
 En `dry_run=true`, el runtime ejecuta Planner, PolicyEngine y ToolRegistry,
 pero no llama a `Tool.run(...)`. La respuesta indica la tool que se habría

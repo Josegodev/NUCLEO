@@ -204,3 +204,28 @@
   - `GET /health`
   - `GET /tools`
   - `POST /agent/run` con `dry_run=true`
+
+## 2026-04-28 - Sincronización documental de hardening por artefactos
+
+- Se actualizó la documentación actual para reflejar el contrato endurecido del
+  runtime orientado a artefactos.
+- Se documentó el comportamiento estricto de `PolicyDecision`:
+  - `decision` usa `PolicyDecisionValue`
+  - `validated_fields` usa `PolicyValidatedField`
+  - `strict=True`
+  - `extra="forbid"`
+- Se documentó `PlannedAction` versionado como artefacto de acción con
+  precondiciones y schema de salida esperada.
+- Se documentó `ToolContractArtifact` obligatorio para registrar tools de
+  producción.
+- Se documentó `AgentResponse` como artefacto estructurado de resultado de
+  ejecución:
+  - `status`
+  - `result`
+  - `errors`
+  - `trace_id`
+  - `version`
+- Se registró el breaking change:
+  - `message` ya no es el contrato público de respuesta.
+  - los estados públicos están cerrados a `success`, `error` y `rejected`.
+- Se reconfirmó que `dry_run=True` no llama a `tool.run(...)`.

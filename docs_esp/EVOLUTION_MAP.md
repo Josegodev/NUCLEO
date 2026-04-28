@@ -1,5 +1,5 @@
 > Archivo origen: `docs/EVOLUTION_MAP.md`
-> Última sincronización: `2026-04-25`
+> Última sincronización: `2026-04-28`
 
 # Mapa de evolución
 
@@ -22,7 +22,10 @@ El repositorio ofrece actualmente:
   - `system_info`
   - `disk_info`
 - `ExecutionContext` propagado a través de API, runtime, policy y tools
-- `AgentResponse` con `status`, `message` y `result` opcional
+- contratos de artefactos explícitos para acciones planificadas, decisiones de
+  policy, contratos de tool y resultados de ejecución
+- `AgentResponse` con `status` cerrado, `result` estructurado opcional,
+  `errors`, `trace_id` y `version`
 
 ## Estado experimental actual
 
@@ -43,20 +46,21 @@ ToolRegistry ni Tools.
 
 ### 1. Contratos internos débiles
 
-- la salida del planner está tipada como `PlannedAction`
-- los contratos de payload de las tools siguen siendo implícitos
-- la salida de las tools aún no está estandarizada más allá del contenedor actual de respuesta
+- la salida del planner está tipada y versionada como `PlannedAction`
+- los contratos de payload y output de las tools son explícitos para las tools
+  de producción registradas
+- `ToolContractArtifact` es obligatorio al registrar una tool de producción
 
 ### 2. Control de ejecución incompleto
 
 - `dry_run` se impone de forma estructural en producción
-- la policy no evalúa el payload en profundidad
+- la policy valida la forma del payload contra el contrato de la tool seleccionada
 - los metadatos `read_only` y `risk_level` aún no se aplican desde policy
 
 ### 3. Gaps de robustez del runtime
 
-- manejo limitado de excepciones estructuradas en runtime
-- no existe una taxonomía formal de errores de dominio
+- el runtime devuelve artefactos estructurados de resultado de ejecución
+- la taxonomía de errores de dominio puede seguir refinándose
 
 ### 4. Acoplamiento de bootstrap
 
@@ -71,10 +75,10 @@ ToolRegistry ni Tools.
 
 ### Prioridad 1 - Reforzar contratos
 
-- seguir endureciendo el contrato tipado de execution plan
-- definir contratos estructurados de payload para tools
-- definir contratos más sólidos para resultados de tools
-- reforzar el contrato de `BaseTool`
+- mantener contratos de artefacto pequeños y explícitos
+- preservar decisiones de policy estrictas y basadas en enum
+- mantener alineados los schemas de entrada/salida con los contratos de tools registradas
+- evitar nuevas abstracciones salvo que un gap de contrato lo exija
 
 ### Prioridad 2 - Imponer control de ejecución
 
@@ -84,8 +88,8 @@ ToolRegistry ni Tools.
 
 ### Prioridad 3 - Mejorar la robustez del runtime
 
-- añadir manejo controlado de errores por etapa del pipeline
-- estandarizar respuestas de error de dominio
+- mantener cubierto por tests el manejo controlado de errores por etapa del pipeline
+- refinar códigos de error de dominio solo cuando aparezca una ambigüedad real
 - mejorar la trazabilidad
 
 ### Prioridad 4 - Desacoplar composición y orquestación

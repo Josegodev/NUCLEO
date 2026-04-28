@@ -19,7 +19,10 @@ The repository currently provides:
   - `system_info`
   - `disk_info`
 - `ExecutionContext` propagated across API, runtime, policy, and tools
-- `AgentResponse` with `status`, `message`, and optional `result`
+- Explicit artifact contracts for planned actions, policy decisions, tool
+  contracts, and execution results
+- `AgentResponse` with closed `status`, optional structured `result`,
+  structured `errors`, `trace_id`, and `version`
 
 ## Current Experimental State
 
@@ -40,20 +43,20 @@ ToolRegistry, or Tools.
 
 ### 1. Weak internal contracts
 
-- planner output is typed as `PlannedAction`
-- tool payload contracts are still implicit
-- tool output is not yet standardized beyond current response container
+- planner output is typed and versioned as `PlannedAction`
+- tool payload and output contracts are explicit for registered production tools
+- `ToolContractArtifact` is mandatory at production registration time
 
 ### 2. Incomplete execution control
 
 - `dry_run` is structurally enforced for production execution
-- policy does not evaluate payload deeply
+- policy validates payload shape against the selected tool contract
 - `read_only` and `risk_level` metadata are still not policy-enforced
 
 ### 3. Runtime robustness gaps
 
-- limited structured exception handling in runtime
-- no formal domain error taxonomy
+- runtime now returns structured execution-result artifacts
+- further domain-specific error taxonomy may still be refined
 
 ### 4. Bootstrap coupling
 
@@ -68,10 +71,10 @@ ToolRegistry, or Tools.
 
 ### Priority 1 - Reinforce contracts
 
-- keep hardening the typed execution plan contract
-- define structured tool payload contracts
-- define stronger tool result contracts
-- strengthen `BaseTool` contract
+- keep artifact contracts small and explicit
+- preserve strict enum-backed policy decisions
+- keep tool input/output schemas aligned with registered tool contracts
+- avoid adding new abstractions unless a contract gap requires it
 
 ### Priority 2 - Enforce execution control
 
@@ -81,8 +84,8 @@ ToolRegistry, or Tools.
 
 ### Priority 3 - Improve runtime robustness
 
-- add controlled error handling by pipeline stage
-- standardize domain error responses
+- keep controlled error handling by pipeline stage covered by tests
+- refine domain error codes only when concrete runtime ambiguity appears
 - improve traceability
 
 ### Priority 4 - Decouple composition from orchestration

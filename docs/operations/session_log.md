@@ -234,3 +234,26 @@
   - `GET /health`
   - `GET /tools`
   - `POST /agent/run` with `dry_run=true`
+
+## 2026-04-28 - Artifact Contract Hardening Documentation Sync
+
+- Updated current documentation to reflect the hardened artifact-driven runtime
+  contract.
+- Documented strict `PolicyDecision` behavior:
+  - `decision` uses `PolicyDecisionValue`
+  - `validated_fields` uses `PolicyValidatedField`
+  - `strict=True`
+  - `extra="forbid"`
+- Documented versioned `PlannedAction` action artifacts with preconditions and
+  expected output schema.
+- Documented mandatory `ToolContractArtifact` registration for production tools.
+- Documented structured `AgentResponse` execution-result artifact:
+  - `status`
+  - `result`
+  - `errors`
+  - `trace_id`
+  - `version`
+- Recorded breaking change:
+  - `message` is no longer the public response contract.
+  - public statuses are closed to `success`, `error`, and `rejected`.
+- Reconfirmed `dry_run=True` does not call `tool.run(...)`.
