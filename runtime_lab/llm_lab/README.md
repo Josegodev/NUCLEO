@@ -8,96 +8,116 @@ Este directorio no forma parte del runtime principal de NUCLEO. No integra LLM
 en `AgentService`, `Runtime`, `Planner`, `PolicyEngine`, `ToolRegistry` ni
 `Tools`.
 
-## LLM Lab / Ruta lateral experimental
+## 1. Arquitectura del RAG
 
-Propósito:
+El sistema RAG implementa un pipeline con separación estricta de responsabilidades:
 
-- cargar contexto de NUCLEO para consultas externas o locales
-- ejecutar chats locales de Mistral/Qwen mediante Ollama
-- conservar memoria local de laboratorio con SQLite
-- generar informes markdown de revisión HARDENING
-
-Estado:
-
-- experimental
-- lateral al runtime
-- no productivo
-- no integrado en el flujo canónico
-
-Flujo canónico de NUCLEO, para comparar:
-
-```text
-Request -> API/FastAPI -> AgentService -> AgentRuntime/Orchestrator -> Planner -> PolicyEngine -> ToolRegistry -> Tool -> AgentResponse
+```
+query
+→ rag_nucleo_docs/search.py (retrieval determinista)
+→ rag_nucleo_docs/evidence.py (paquete de evidencias)
+→ rag_nucleo_docs/rag_answer.py (respuesta extractiva determinista, sin LLM)
+→ llm_rag_answer.py (capa experimental de generación LLM)
 ```
 
-`llm_lab` no aparece en ese flujo.
+## 2. Separación de responsabilidades
 
-Permisos de esta ruta:
+- **Retrieval (Determinista)**: `rag_nucleo_docs/` maneja la búsqueda y empaquetado de evidencia sin usar LLM. El resultado es determinista y reproducible.
+- **Evidence (Contrato Cerrado)**: `evidence.py` define un contrato fijo para el paquete de evidencias, independiente de modelos.
+- **LLM Generation (Experimental)**: `llm_rag_answer.py` consume evidencia determinista y genera respuestas usando modelos LLM vía `model_adapter.py`.
+- **Model Execution**: `model_adapter.py` abstrae la ejecución de modelos (Ollama/local), sin lógica de negocio.
 
-- leer documentación y archivos seleccionados del repo para construir contexto
-- escribir bases SQLite locales dentro de `runtime_lab/llm_lab/`
-- escribir informes bajo `runtime_lab/llm_lab/reports/`
-- llamar a Ollama local solo cuando se ejecutan los chats Mistral/Qwen
-- llamar a proveedores remotos solo desde el runner de experimentos, cuando el
-  `model_id` usa un prefijo remoto y la API key correspondiente existe en el
-  entorno
+Reglas estrictas:
+- Retrieval NO usa LLM.
+- LLM no decide fuentes ni altera evidencia.
+- LLM no ejecuta tools ni modifica runtime.
+- Evidence siempre se devuelve intacta.
 
-Prohibido para esta ruta:
+## 3. Contratos
 
-- ejecutar tools de producción
-- modificar `PolicyEngine`
-- registrar tools en `ToolRegistry`
-- llamar automáticamente a `/agent/run`
-- actuar como `Planner`
-- decidir permisos o saltarse policy
+### search()
+- **Entrada**: `query` (str)
+- **Salida**: Lista ordenada determinista de resultados con `doc_id`, `file`, `score`, `snippet`.
 
-Importante: Mistral y Qwen pueden responder preguntas sobre NUCLEO usando
-contexto cargado, pero sus respuestas no cambian el runtime y no tienen
-autoridad de ejecución.
+### evidence_package
+```json
+{
+  "query": "string",
+  "status": "EVIDENCE_FOUND" | "NO_EVIDENCE",
+  "evidence": [
+    {
+      "doc_id": "string",
+      "source": "string",
+      "score": float,
+      "snippet": "string"
+    }
+  ]
+}
+```
 
-## Separación de Retrieval y Generación LLM
+### llm_rag_answer
+```json
+{
+  "query": "string",
+  "model": "string",
+  "status": "EVIDENCE_FOUND" | "NO_EVIDENCE",
+  "answer": "string",
+  "evidence": [...]
+}
+```
 
-- **Retrieval/Evidence Determinista**: Módulo `rag_nucleo_docs/` maneja la recuperación determinista de evidencia desde la documentación Markdown de NUCLEO. No contiene lógica LLM.
-- **Generación LLM Experimental**: `llm_rag_answer.py` consume la evidencia determinista de `rag_nucleo_docs.evidence.build_evidence_package` y genera respuestas usando modelos LLM vía `model_adapter.call_model`. Si no hay evidencia, devuelve "NO_CONSTA_EN_DOCUMENTACION" sin llamar al modelo.
+## 4. Reglas de seguridad del RAG
 
-## Estado documentado
+- Si `status == NO_EVIDENCE` → NO llamar al LLM, devolver `"NO_CONSTA_EN_DOCUMENTACION"`.
+- Respuesta LLM debe derivarse únicamente de snippets proporcionados.
+- No se permite conocimiento externo del modelo.
+- Evidence se devuelve intacta, sin modificaciones.
 
-### Antiguo
+## 5. Validación
 
-- Los chats llamaban a Ollama y leian directamente
-  `response.json()["message"]["content"]`.
-- Si Ollama no estaba disponible, el proceso terminaba con una traza completa
-  de Python.
-- La documentacion de Qwen estaba duplicada desde Mistral y mencionaba archivos
-  y modelo incorrectos.
-- La instalacion dependia de usar `.venv`, pero el fallo fuera del entorno no
-  estaba explicado.
+### eval_cases.json
+Contiene casos de prueba con términos esperados, prohibidos y fuentes requeridas.
 
-### Nuevo verificado
+### smoke_test.py
+Valida:
+- Términos esperados en respuestas.
+- Ausencia de términos prohibidos.
+- Presencia de fuentes requeridas.
+- Determinismo en retrieval.
 
-- `run_mistral.py` arranca desde la raiz del repo.
-- `run_qwen.py` arranca desde la raiz del repo.
-- Ambos scripts inicializan su SQLite local.
-- Ambos scripts usan rutas absolutas basadas en `__file__`.
-- Ambos scripts cargan `contexto.txt` si existe.
-- Ambos scripts validan que Ollama devuelva JSON con `message.content`.
-- Si Ollama no responde, el chat muestra un error controlado y vuelve al prompt.
-- `experiment_runner.py` conserva `--mode ollama` como ruta de ejecucion real
-  y `model_adapter.py` infiere proveedor por prefijo de `model_id`.
-- Los prefijos remotos soportados en experimentos son `openai:`,
-  `anthropic:` y `google:`.
-- Si falta una API key remota, el experimento registra un error controlado
-  `model_not_available` en el artefacto.
-- `nucleo_state_review.py` genera un informe markdown en `reports/`.
-- `.venv` tiene instalado `requests==2.33.1`.
+Ejecución: `python3 -m runtime_lab.llm_lab.rag_nucleo_docs.smoke_test`
 
-Comportamiento verificado el 25 de abril de 2026:
+## 6. Ejecución
+
+Ejemplos reales de uso:
 
 ```bash
-.venv/bin/python -m py_compile runtime_lab/llm_lab/run_mistral.py runtime_lab/llm_lab/run_qwen.py runtime_lab/llm_lab/nucleo_state_review.py runtime_lab/llm_lab/mistral/chat_mistral_sqlite.py runtime_lab/llm_lab/qwen/chat_qwen_sqlite.py
-printf 'hola\nsalir\n' | .venv/bin/python runtime_lab/llm_lab/run_mistral.py
-printf 'hola\nsalir\n' | .venv/bin/python runtime_lab/llm_lab/run_qwen.py
-NUCLEO_REPO_PATH=/home/jose-gonzalez-oliva/NUCLEO .venv/bin/python runtime_lab/llm_lab/nucleo_state_review.py --context-limit-chars 2000
+python3 -m runtime_lab.llm_lab.llm_rag_answer "Qué hace dry_run=True?" --model mistral
+python3 -m runtime_lab.llm_lab.llm_rag_answer "Qué hace dry_run=True?" --model qwen
+python3 -m runtime_lab.llm_lab.llm_rag_answer "Qué hace dry_run=True?" --model llama3.1:8b
+```
+
+Modelos soportados: `mistral`, `qwen`, `llama3.1:8b` (vía Ollama).
+
+## 7. Limitaciones actuales
+
+- LLM puede variar redacción en respuestas.
+- Posibles errores de formato en output del modelo.
+- Dependencia de calidad y completitud de snippets.
+- No hay council ni agregación multi-modelo implementados.
+
+## 8. Estado del sistema
+
+**HARDENING COMPLETADO (RETRIEVAL + EVIDENCE)**  
+**LLM INTEGRATION: EXPERIMENTAL**
+
+## 9. Próximos pasos (no implementados)
+
+- Council (comparación multi-modelo).
+- Scoring de respuestas.
+- Integración opcional en runtime NUCLEO.
+
+Estos features NO están implementados actualmente.
 ```
 
 En este entorno, la conexion a `localhost:11434` no estuvo disponible. Por eso
