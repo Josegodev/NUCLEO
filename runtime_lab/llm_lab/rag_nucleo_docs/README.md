@@ -75,10 +75,18 @@ Run from the repository root:
 python3 -m runtime_lab.llm_lab.rag_nucleo_docs.build_index
 python3 -m runtime_lab.llm_lab.rag_nucleo_docs.query_index "Qué hace dry_run=True?"
 python3 -m runtime_lab.llm_lab.rag_nucleo_docs.rag_answer "Qué hace dry_run=True?"
+python3 -m runtime_lab.llm_lab.rag_nucleo_docs.rag_answer "Qué hace dry_run=True?" --mode llm
 ```
 
 Do not run these files directly as loose scripts. They use package-relative
 imports so that local modules such as `config.py` are resolved unambiguously.
+
+`rag_answer.py` supports:
+
+- `--mode extractive` (default): returns retrieved snippets directly.
+- `--mode llm`: calls `runtime_lab/llm_lab/model_adapter.py` with the retrieved
+  chunks as bounded context. If retrieval finds no evidence, it does not call
+  the model and returns `NO_CONSTA_EN_DOCUMENTACION`.
 
 
 ## Output Contracts

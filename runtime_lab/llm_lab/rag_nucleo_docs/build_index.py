@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+import unicodedata
 
 sys.dont_write_bytecode = True
 
@@ -14,6 +15,7 @@ from .ingest_md import discover_markdown_files
 
 
 TOKEN_RE = re.compile(r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9_]+")
+NORMALIZED_TOKEN_RE = re.compile(r"[a-z0-9_]+")
 STOPWORDS = {
     "a",
     "al",
@@ -54,6 +56,29 @@ def tokenize(text: str) -> list[str]:
     )
 
 
+def normalize_text(text: str) -> str:
+    """Normalize text for accent-insensitive lexical retrieval."""
+    without_accents = "".join(
+        char
+        for char in unicodedata.normalize("NFKD", text.lower())
+        if not unicodedata.combining(char)
+    )
+    without_symbols = re.sub(r"[^a-z0-9_]+", " ", without_accents)
+    return " ".join(without_symbols.split())
+
+
+def normalized_tokenize(text: str) -> list[str]:
+    """Tokenize normalized text deterministically."""
+    normalized = normalize_text(text)
+    return sorted(
+        set(
+            token
+            for token in NORMALIZED_TOKEN_RE.findall(normalized)
+            if token not in STOPWORDS
+        )
+    )
+
+
 def build_index() -> dict[str, object]:
     """Build the Markdown chunk index without copying source files elsewhere."""
     chunks: list[dict[str, object]] = []
@@ -64,6 +89,8 @@ def build_index() -> dict[str, object]:
             indexed_chunk["source_type"] = source_type
             indexed_chunk["source_weight"] = source_weight
             indexed_chunk["tokens"] = tokenize(str(chunk["text"]))
+            indexed_chunk["normalized_text"] = normalize_text(str(chunk["text"]))
+            indexed_chunk["normalized_tokens"] = normalized_tokenize(str(chunk["text"]))
             chunks.append(indexed_chunk)
 
     chunks.sort(key=lambda item: (str(item["file"]), int(item["start_line"]), str(item["chunk_id"])))

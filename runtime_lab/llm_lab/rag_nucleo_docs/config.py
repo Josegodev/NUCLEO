@@ -29,6 +29,11 @@ SOURCE_WEIGHTS = {
     "docs/planning/": 0.7,
 }
 DEFAULT_SOURCE_WEIGHT = 1.0
+QUERY_SYNONYMS = {
+    "dry_run": ["dryrun", "dry-run"],
+    "execute": ["run", "call", "invoke"],
+    "tool": ["tool", "herramienta"],
+}
 
 EXCLUDED_PARTS = {
     ".git",
