@@ -1,6 +1,6 @@
 # RAG NUCLEO Docs
 
-Experimental lexical retrieval over live Markdown documentation in the NUCLEO
+Deterministic lexical retrieval over live Markdown documentation in the NUCLEO
 repository.
 
 Este módulo no ejecuta herramientas ni interactúa con el runtime de NUCLEO.
@@ -8,8 +8,8 @@ Este módulo no ejecuta herramientas ni interactúa con el runtime de NUCLEO.
 ## Purpose
 
 This module helps inspect current Markdown documentation during HARDENING. It
-builds a local lexical index from `.md` files and answers questions by returning
-extractive snippets from those files.
+builds a local lexical index from `.md` files and retrieves matching snippets
+from those files.
 
 It is not part of the NUCLEO runtime. It is not an agent. It does not execute
 tools. It does not call `AgentService`, `AgentRuntime`, `Planner`,
@@ -24,7 +24,7 @@ tools. It does not call `AgentService`, `AgentRuntime`, `Planner`,
 - No embeddings.
 - No vector database.
 - No semantic similarity.
-- No generated synthesis.
+- No generated synthesis in the retrieval contract.
 - No access to `CONTROL_OPERATIVO`.
 - Excludes generated outputs, snapshots, deprecated docs, historical reports,
   external repositories, and this lab directory from retrieval.
@@ -44,11 +44,25 @@ chunk_md.py
   -> split files by #, ##, ### headings
 build_index.py
   -> tokenize chunks and write .index/md_chunks_index.json
+search.py
+  -> load index, normalize query, score chunks, rank, and return top_k results
 query_index.py
-  -> score chunks by lexical token overlap weighted by document type
-rag_answer.py
-  -> concatenate retrieved snippets with file:line references
+  -> temporary legacy wrapper around search.py
 ```
+
+## Public API
+
+`search.py` is the only public API for deterministic retrieval:
+
+```python
+search(query: str, top_k: int = 5)
+```
+
+`query_index.py` is a temporary legacy wrapper. It must not contain scoring,
+ranking, filtering, or result-building logic of its own.
+
+This retrieval API returns evidence snippets only. It does not generate an
+answer, call an LLM, use embeddings, or connect to a vector database.
 
 ## Scoring
 
@@ -74,32 +88,25 @@ Run from the repository root:
 ```bash
 python3 -m runtime_lab.llm_lab.rag_nucleo_docs.build_index
 python3 -m runtime_lab.llm_lab.rag_nucleo_docs.query_index "Qué hace dry_run=True?"
-python3 -m runtime_lab.llm_lab.rag_nucleo_docs.rag_answer "Qué hace dry_run=True?"
-python3 -m runtime_lab.llm_lab.rag_nucleo_docs.rag_answer "Qué hace dry_run=True?" --mode llm
 ```
 
 Do not run these files directly as loose scripts. They use package-relative
 imports so that local modules such as `config.py` are resolved unambiguously.
 
-`rag_answer.py` supports:
-
-- `--mode extractive` (default): returns retrieved snippets directly.
-- `--mode llm`: calls `runtime_lab/llm_lab/model_adapter.py` with the retrieved
-  chunks as bounded context. If retrieval finds no evidence, it does not call
-  the model and returns `NO_CONSTA_EN_DOCUMENTACION`.
-
-
 ## Output Contracts
 
-`query_index.py` returns:
+`search.py` returns:
 
 ```json
 {
+  "query": "...",
   "question": "...",
   "status": "FOUND",
   "results": [
     {
+      "doc_id": "...",
       "score": 1.0,
+      "snippet": "...",
       "chunk_id": "...",
       "file": "...",
       "heading": "...",
@@ -111,29 +118,16 @@ imports so that local modules such as `config.py` are resolved unambiguously.
 }
 ```
 
-`rag_answer.py` returns extractive snippets:
-
-```json
-{
-  "question": "...",
-  "answer": "[docs/file.md:10] ...",
-  "sources": [
-    {
-      "file": "docs/file.md",
-      "heading": "Heading",
-      "start_line": 10,
-      "end_line": 20,
-      "score": 0.5
-    }
-  ],
-  "warnings": ["Extractive lexical retrieval only. No LLM synthesis or inference was used."]
-}
-```
-
 When no evidence is found:
 
 ```json
 {
-  "answer": "NO_CONSTA_EN_DOCUMENTACION"
+  "query": "...",
+  "question": "...",
+  "status": "NO_CONSTA_EN_DOCUMENTACION",
+  "results": []
 }
 ```
+
+`eval_cases.json` is an optional JSON array of evaluation cases. An empty suite
+is represented as `[]`.

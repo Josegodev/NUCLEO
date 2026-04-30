@@ -10,7 +10,7 @@ import argparse
 import json
 
 from .config import DEFAULT_TOP_K
-from .query_index import query
+from .search import search
 from ..model_adapter import AdapterMode, call_model
 
 
@@ -152,7 +152,7 @@ def build_answer(
     timeout_ms: int = DEFAULT_TIMEOUT_MS,
 ) -> dict[str, object]:
     """Build an evidence-bound answer from lexical retrieval."""
-    retrieval = query(question, top_k=top_k)
+    retrieval = search(question, top_k=top_k)
 
     if retrieval["status"] != "FOUND":
         return {
