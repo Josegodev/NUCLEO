@@ -13,6 +13,7 @@ from .config import INDEX_FILE, QUERY_SYNONYMS
 
 NO_EVIDENCE = "NO_CONSTA_EN_DOCUMENTACION"
 DRY_RUN_PHRASE_BOOST = 0.5
+MAX_SCORE_GAP_FROM_BEST = 0.4
 DRY_RUN_PHRASES = (
     "does not call tool.run",
     "no llama a tool.run",
@@ -90,14 +91,69 @@ def score_chunk(
     )
 
 
-def build_result(chunk: dict[str, object], score: float) -> dict[str, object]:
+def trim_snippet(text: str, max_length: int = 900) -> str:
+    """Keep snippets bounded and deterministic."""
+    compact = text.strip()
+    if len(compact) <= max_length:
+        return compact
+    return compact[:max_length].rstrip() + "..."
+
+
+def collect_heading_block(lines: list[str], index: int, max_lines: int = 12) -> set[int]:
+    """Collect a short section when the matching line is a Markdown heading."""
+    selected = {index}
+    for next_index in range(index + 1, min(len(lines), index + max_lines)):
+        if lines[next_index].startswith("#"):
+            break
+        selected.add(next_index)
+    return selected
+
+
+def collect_continuation_lines(lines: list[str], index: int) -> set[int]:
+    """Collect an indented Markdown continuation after a matching list line."""
+    selected = {index}
+    next_index = index + 1
+    while next_index < len(lines) and lines[next_index].startswith((" ", "\t")):
+        selected.add(next_index)
+        next_index += 1
+    return selected
+
+
+def build_snippet(text: str, query_tokens: set[str]) -> str:
+    """Build focused evidence lines without changing the full chunk text."""
+    lines = text.splitlines()
+    selected_indexes: set[int] = set()
+
+    for index, line in enumerate(lines):
+        line_tokens = set(normalized_tokenize(line))
+        if not (line_tokens & query_tokens):
+            continue
+        if line.startswith("#"):
+            selected_indexes.update(collect_heading_block(lines, index))
+        else:
+            selected_indexes.update(collect_continuation_lines(lines, index))
+
+    if not selected_indexes:
+        return trim_snippet(text)
+
+    snippet = "\n".join(
+        line for index, line in enumerate(lines) if index in selected_indexes
+    )
+    return trim_snippet(snippet)
+
+
+def build_result(
+    chunk: dict[str, object],
+    score: float,
+    query_tokens: set[str],
+) -> dict[str, object]:
     """Build a stable public result while keeping legacy fields available."""
     text = str(chunk["text"])
     doc_id = str(chunk["chunk_id"])
     return {
         "doc_id": doc_id,
         "score": round(score, 6),
-        "snippet": text,
+        "snippet": build_snippet(text, query_tokens),
         "chunk_id": doc_id,
         "file": str(chunk["file"]),
         "heading": str(chunk["heading"]),
@@ -123,7 +179,7 @@ def search(query: str, top_k: int = 5) -> dict[str, object]:
         score = score_chunk(query, query_tokens, len(base_query_tokens), chunk)
         if score <= 0:
             continue
-        scored.append(build_result(chunk, score))
+        scored.append(build_result(chunk, score, base_query_tokens))
 
     scored.sort(
         key=lambda item: (
@@ -133,7 +189,16 @@ def search(query: str, top_k: int = 5) -> dict[str, object]:
             str(item["doc_id"]),
         )
     )
-    results = scored[:top_k]
+    candidates = scored[:top_k]
+    if candidates:
+        best_score = float(candidates[0]["score"])
+        results = [
+            result
+            for result in candidates
+            if best_score - float(result["score"]) <= MAX_SCORE_GAP_FROM_BEST
+        ]
+    else:
+        results = []
     status = "FOUND" if results else NO_EVIDENCE
     return {
         "query": query,

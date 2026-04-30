@@ -1,1 +1,92 @@
-[]
+{
+    "version": "rag_eval.v1",
+    "target": "retrieval",
+    "cases": [
+        {
+            "id": "dry_run_contract",
+            "question": "Qué hace dry_run=True?",
+            "expected_terms": [
+                "does not call tool.run",
+                "executed=false"
+            ],
+            "forbidden_terms": [
+                "executes tool",
+                "runs tool"
+            ],
+            "min_sources": 1,
+            "required_sources": [
+                "docs/modules/code_contracts.md"
+            ]
+        },
+        {
+            "id": "policy_decision_contract",
+            "question": "Qué valores puede tener PolicyDecision?",
+            "expected_terms": [
+                "PolicyDecisionValue",
+                "ALLOW",
+                "DENY"
+            ],
+            "forbidden_terms": [
+                "string",
+                "free value"
+            ],
+            "min_sources": 1,
+            "required_sources": [
+                "docs/modules/code_contracts.md"
+            ]
+        },
+        {
+            "id": "agent_response_contract",
+            "question": "Qué campos tiene AgentResponse?",
+            "expected_terms": [
+                "status",
+                "result",
+                "errors",
+                "trace_id",
+                "version"
+            ],
+            "forbidden_terms": [
+                "message is main contract"
+            ],
+            "min_sources": 1,
+            "required_sources": [
+                "docs/modules/code_contracts.md"
+            ]
+        },
+        {
+            "id": "canonical_flow",
+            "question": "Cuál es el flujo canónico de NUCLEO?",
+            "expected_terms": [
+                "AgentService",
+                "AgentRuntime",
+                "Planner",
+                "PolicyEngine",
+                "ToolRegistry"
+            ],
+            "forbidden_terms": [],
+            "min_sources": 1,
+            "required_sources": []
+        },
+        {
+            "id": "tool_registry_role",
+            "question": "Qué hace ToolRegistry?",
+            "expected_terms": [
+                "resolve",
+                "tool",
+                "registry"
+            ],
+            "forbidden_terms": [],
+            "min_sources": 1,
+            "required_sources": []
+        },
+        {
+            "id": "nonexistent_concept",
+            "question": "Qué es zxqv concepto inexistente 12345?",
+            "expected_terms": [],
+            "forbidden_terms": [],
+            "expected_results": 0,
+            "min_sources": 0,
+            "required_sources": []
+        }
+    ]
+}
