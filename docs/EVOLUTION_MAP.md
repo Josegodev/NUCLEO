@@ -49,7 +49,8 @@ ToolRegistry, or Tools.
 
 ### 2. Incomplete execution control
 
-- `dry_run` is structurally enforced for production execution
+- `dry_run=True` validates planning, policy, registry, and tracing, but does
+  not call `tool.run(...)`
 - policy validates payload shape against the selected tool contract
 - `read_only` and `risk_level` metadata are still not policy-enforced
 
@@ -78,7 +79,7 @@ ToolRegistry, or Tools.
 
 ### Priority 2 - Enforce execution control
 
-- keep `dry_run` deterministic and covered by tests
+- keep `dry_run` deterministic, non-executing, and covered by tests
 - use tool metadata in policy decisions
 - prepare payload-aware policy checks
 

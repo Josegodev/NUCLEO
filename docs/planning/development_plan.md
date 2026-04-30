@@ -34,7 +34,8 @@ Make execution semantics safer and more explicit.
 
 Actions:
 
-- enforce meaningful `dry_run`
+- enforce meaningful `dry_run`: `dry_run=True` must validate planning, policy,
+  registry, and tracing without calling `tool.run(...)`
 - use `read_only` and `risk_level` in policy decisions
 - prepare payload-aware restrictions
 

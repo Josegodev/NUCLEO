@@ -67,7 +67,8 @@ La forma objetivo preserva el pipeline estable, pero refuerza la calidad de los 
 ### PolicyEngine
 
 - Pasar de comprobaciones name-based a control sensible a metadatos y payload
-- Imponer un `dry_run` con significado real
+- Imponer un `dry_run` con significado real: validar planificación, policy,
+  registry y tracing sin llamar a `tool.run(...)`
 - Preservar el comportamiento deny-by-default
 
 ### ToolRegistry
@@ -102,7 +103,7 @@ El código actual ya contiene una primera ruta experimental de laboratorio, pero
 
 - execution plan tipado
 - validación estricta de planes en runtime
-- enforcement completo de dry-run
+- enforcement completo de dry-run sin llamar a `tool.run(...)`
 - policy sensible al payload
 - trazabilidad completa de la ejecución de producción
 - planificación real soportada por LLM en condiciones controladas

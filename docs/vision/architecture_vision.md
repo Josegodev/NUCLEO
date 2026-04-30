@@ -64,7 +64,8 @@ The target shape preserves the stable pipeline, but strengthens contract quality
 ### PolicyEngine
 
 - Move from name-based checks to metadata-aware and payload-aware control
-- Enforce meaningful `dry_run`
+- Enforce meaningful `dry_run`: validate planning, policy, registry, and
+  tracing without calling `tool.run(...)`
 - Preserve deny-by-default behavior
 
 ### ToolRegistry
@@ -99,7 +100,7 @@ Current code already contains a first experimental lab path, but the target arch
 
 - typed execution plan
 - strict runtime plan validation
-- full dry-run enforcement
+- full dry-run enforcement without calling `tool.run(...)`
 - payload-aware policy
 - complete traceability of production execution
 - real LLM-backed planning under controlled conditions

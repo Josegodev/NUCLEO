@@ -37,7 +37,8 @@ Hacer que la semántica de ejecución sea más segura y explícita.
 
 Acciones:
 
-- imponer un `dry_run` con significado real
+- imponer un `dry_run` con significado real: `dry_run=True` debe validar
+  planificación, policy, registry y tracing sin llamar a `tool.run(...)`
 - usar `read_only` y `risk_level` en decisiones de policy
 - preparar restricciones sensibles al payload
 

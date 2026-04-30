@@ -24,7 +24,7 @@ verified behavior is:
 - `PolicyValidatedField` is a closed enum
 - `ToolContractArtifact` is required for production tool registration
 - `dry_run=True` evaluates planner, policy, and registry, but does not call
-  `Tool.run(...)`
+  `Tool.run(...)` or `tool.run(...)`
 - runtime tracing is internal and in-memory only
 - `AgentResponse` exposes `status`, optional structured `result`, `errors`,
   `trace_id`, and `version`

@@ -53,7 +53,8 @@ ToolRegistry ni Tools.
 
 ### 2. Control de ejecución incompleto
 
-- `dry_run` se impone de forma estructural en producción
+- `dry_run=True` valida planificación, policy, registry y tracing, pero no
+  llama a `tool.run(...)`
 - la policy valida la forma del payload contra el contrato de la tool seleccionada
 - los metadatos `read_only` y `risk_level` aún no se aplican desde policy
 
@@ -82,7 +83,7 @@ ToolRegistry ni Tools.
 
 ### Prioridad 2 - Imponer control de ejecución
 
-- mantener `dry_run` determinista y cubierto por tests
+- mantener `dry_run` determinista, sin ejecución real, y cubierto por tests
 - usar metadatos de tools en decisiones de policy
 - preparar comprobaciones de policy sensibles al payload
 
