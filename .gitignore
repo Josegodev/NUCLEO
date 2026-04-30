@@ -46,3 +46,4 @@ runtime_lab/recoleccion/outputs/
 runtime_lab/recoleccion/data/
 runtime_lab/recoleccion/outputs/
 *.csv
+runtime_lab/llm_lab/rag_nucleo_docs/.index/

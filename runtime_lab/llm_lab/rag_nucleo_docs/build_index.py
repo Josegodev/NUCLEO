@@ -9,7 +9,7 @@ import sys
 sys.dont_write_bytecode = True
 
 from .chunk_md import chunk_markdown_file
-from .config import INDEX_DIR, INDEX_FILE, relative_to_root
+from .config import INDEX_DIR, INDEX_FILE, relative_to_root, source_profile
 from .ingest_md import discover_markdown_files
 
 
@@ -60,6 +60,9 @@ def build_index() -> dict[str, object]:
     for path in discover_markdown_files():
         for chunk in chunk_markdown_file(path):
             indexed_chunk = dict(chunk)
+            source_type, source_weight = source_profile(str(chunk["file"]))
+            indexed_chunk["source_type"] = source_type
+            indexed_chunk["source_weight"] = source_weight
             indexed_chunk["tokens"] = tokenize(str(chunk["text"]))
             chunks.append(indexed_chunk)
 

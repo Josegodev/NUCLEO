@@ -19,6 +19,16 @@ INDEX_DIR = Path(__file__).resolve().parent / ".index"
 INDEX_FILE = INDEX_DIR / "md_chunks_index.json"
 INCLUDED_SUFFIXES = {".md"}
 DEFAULT_TOP_K = 5
+SOURCE_WEIGHTS = {
+    "docs/modules/code_contracts.md": 2.0,
+    "docs/modules/": 1.6,
+    "docs/architecture.md": 1.5,
+    "docs/operations/": 1.2,
+    "README.md": 0.9,
+    "docs/vision/": 0.7,
+    "docs/planning/": 0.7,
+}
+DEFAULT_SOURCE_WEIGHT = 1.0
 
 EXCLUDED_PARTS = {
     ".git",
@@ -56,3 +66,22 @@ def is_excluded(path: Path) -> bool:
 def is_included_markdown(path: Path) -> bool:
     """Return True when path is an allowed Markdown source file."""
     return path.is_file() and path.suffix in INCLUDED_SUFFIXES and not is_excluded(path)
+
+
+def source_profile(relative_file: str) -> tuple[str, float]:
+    """Return source type and weight for a repository-relative Markdown file."""
+    if relative_file == "docs/modules/code_contracts.md":
+        return "code_contracts", SOURCE_WEIGHTS["docs/modules/code_contracts.md"]
+    if relative_file.startswith("docs/modules/"):
+        return "module_docs", SOURCE_WEIGHTS["docs/modules/"]
+    if relative_file == "docs/architecture.md":
+        return "architecture", SOURCE_WEIGHTS["docs/architecture.md"]
+    if relative_file.startswith("docs/operations/"):
+        return "operations", SOURCE_WEIGHTS["docs/operations/"]
+    if relative_file == "README.md":
+        return "readme", SOURCE_WEIGHTS["README.md"]
+    if relative_file.startswith("docs/vision/"):
+        return "vision", SOURCE_WEIGHTS["docs/vision/"]
+    if relative_file.startswith("docs/planning/"):
+        return "planning", SOURCE_WEIGHTS["docs/planning/"]
+    return "other", DEFAULT_SOURCE_WEIGHT

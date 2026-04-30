@@ -45,10 +45,27 @@ chunk_md.py
 build_index.py
   -> tokenize chunks and write .index/md_chunks_index.json
 query_index.py
-  -> score chunks by lexical token overlap
+  -> score chunks by lexical token overlap weighted by document type
 rag_answer.py
   -> concatenate retrieved snippets with file:line references
 ```
+
+## Scoring
+
+Retrieval is still lexical only. It does not use embeddings or semantic
+similarity. Scores combine token overlap with a document-type weight so that
+contractual documentation is prioritized over examples:
+
+- `docs/modules/code_contracts.md`
+- `docs/modules/`
+- `docs/architecture.md`
+- `docs/operations/`
+- `README.md`
+- `docs/vision/`
+- `docs/planning/`
+
+For `dry_run` questions, chunks with exact non-execution phrases such as
+`does not call tool.run` or `no llama a tool.run` receive a small lexical boost.
 
 ## CLI
 

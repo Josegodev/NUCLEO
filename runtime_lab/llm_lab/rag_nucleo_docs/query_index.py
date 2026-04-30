@@ -13,6 +13,12 @@ from .config import INDEX_FILE
 
 
 NO_EVIDENCE = "NO_CONSTA_EN_DOCUMENTACION"
+DRY_RUN_PHRASE_BOOST = 0.5
+DRY_RUN_PHRASES = (
+    "does not call tool.run",
+    "no llama a tool.run",
+    "executed=false",
+)
 
 
 def load_index() -> dict[str, object]:
@@ -24,8 +30,29 @@ def load_index() -> dict[str, object]:
     return json.loads(INDEX_FILE.read_text(encoding="utf-8"))
 
 
-def score_chunk(question_tokens: set[str], chunk: dict[str, object]) -> float:
-    """Score one chunk by query-token overlap."""
+def normalize_for_phrase_match(text: str) -> str:
+    """Normalize text for exact phrase checks without semantic inference."""
+    normalized = text.lower().replace("`", "")
+    normalized = " ".join(normalized.split())
+    return normalized.replace('"executed": false', "executed=false")
+
+
+def exact_phrase_boost(question: str, chunk_text: str) -> float:
+    """Boost dry_run chunks that contain explicit non-execution evidence."""
+    if "dry_run" not in question.lower():
+        return 0.0
+    normalized_text = normalize_for_phrase_match(chunk_text)
+    if any(phrase in normalized_text for phrase in DRY_RUN_PHRASES):
+        return DRY_RUN_PHRASE_BOOST
+    return 0.0
+
+
+def score_chunk(
+    question: str,
+    question_tokens: set[str],
+    chunk: dict[str, object],
+) -> float:
+    """Score one chunk by weighted query-token overlap."""
     if not question_tokens:
         return 0.0
     chunk_tokens = set(str(token) for token in chunk.get("tokens", []))
@@ -33,7 +60,12 @@ def score_chunk(question_tokens: set[str], chunk: dict[str, object]) -> float:
     required_overlap = min(2, len(question_tokens))
     if len(overlap) < required_overlap:
         return 0.0
-    return len(overlap) / len(question_tokens)
+    token_overlap_score = len(overlap) / len(question_tokens)
+    source_weight = float(chunk.get("source_weight", 1.0))
+    return (token_overlap_score * source_weight) + exact_phrase_boost(
+        question,
+        str(chunk.get("text", "")),
+    )
 
 
 def query(question: str, top_k: int = 5) -> dict[str, object]:
@@ -45,7 +77,7 @@ def query(question: str, top_k: int = 5) -> dict[str, object]:
     for chunk in index.get("chunks", []):
         if not isinstance(chunk, dict):
             continue
-        score = score_chunk(question_tokens, chunk)
+        score = score_chunk(question, question_tokens, chunk)
         if score <= 0:
             continue
         scored.append(
