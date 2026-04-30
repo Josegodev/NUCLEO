@@ -1,7 +1,8 @@
 # llm_lab
 
-Laboratorio local externo para ejecutar chats de Mistral y Qwen con Ollama y
-para generar informes de revision HARDENING sobre NUCLEO.
+Laboratorio externo para ejecutar chats de Mistral y Qwen con Ollama, lanzar
+experimentos multi-modelo locales o remotos, y generar informes de revision
+HARDENING sobre NUCLEO.
 
 Este directorio no forma parte del runtime principal de NUCLEO. No integra LLM
 en `AgentService`, `Runtime`, `Planner`, `PolicyEngine`, `ToolRegistry` ni
@@ -37,6 +38,9 @@ Permisos de esta ruta:
 - escribir bases SQLite locales dentro de `runtime_lab/llm_lab/`
 - escribir informes bajo `runtime_lab/llm_lab/reports/`
 - llamar a Ollama local solo cuando se ejecutan los chats Mistral/Qwen
+- llamar a proveedores remotos solo desde el runner de experimentos, cuando el
+  `model_id` usa un prefijo remoto y la API key correspondiente existe en el
+  entorno
 
 Prohibido para esta ruta:
 
@@ -50,6 +54,11 @@ Prohibido para esta ruta:
 Importante: Mistral y Qwen pueden responder preguntas sobre NUCLEO usando
 contexto cargado, pero sus respuestas no cambian el runtime y no tienen
 autoridad de ejecución.
+
+## Separación de Retrieval y Generación LLM
+
+- **Retrieval/Evidence Determinista**: Módulo `rag_nucleo_docs/` maneja la recuperación determinista de evidencia desde la documentación Markdown de NUCLEO. No contiene lógica LLM.
+- **Generación LLM Experimental**: `llm_rag_answer.py` consume la evidencia determinista de `rag_nucleo_docs.evidence.build_evidence_package` y genera respuestas usando modelos LLM vía `model_adapter.call_model`. Si no hay evidencia, devuelve "NO_CONSTA_EN_DOCUMENTACION" sin llamar al modelo.
 
 ## Estado documentado
 
@@ -73,6 +82,12 @@ autoridad de ejecución.
 - Ambos scripts cargan `contexto.txt` si existe.
 - Ambos scripts validan que Ollama devuelva JSON con `message.content`.
 - Si Ollama no responde, el chat muestra un error controlado y vuelve al prompt.
+- `experiment_runner.py` conserva `--mode ollama` como ruta de ejecucion real
+  y `model_adapter.py` infiere proveedor por prefijo de `model_id`.
+- Los prefijos remotos soportados en experimentos son `openai:`,
+  `anthropic:` y `google:`.
+- Si falta una API key remota, el experimento registra un error controlado
+  `model_not_available` en el artefacto.
 - `nucleo_state_review.py` genera un informe markdown en `reports/`.
 - `.venv` tiene instalado `requests==2.33.1`.
 
@@ -258,10 +273,52 @@ El runner acepta nombres con tag, por ejemplo `mistral:latest`.
   --input "Explica el contrato de artefactos de llm_lab"
 ```
 
+### Proveedores remotos en experimentos
+
+El runner mantiene `--mode ollama` por compatibilidad. En esta ruta, `ollama`
+significa "ejecucion real de modelo"; el proveedor concreto se infiere desde el
+prefijo de cada `model_id`.
+
+Convencion de IDs:
+
+```text
+qwen                         -> Ollama local
+mistral                      -> Ollama local
+llama3.1:8b                  -> Ollama local
+openai:gpt-4o                -> proveedor OpenAI-compatible
+anthropic:claude-...         -> Anthropic
+google:gemini-...            -> Google
+```
+
+Variables de entorno usadas por los proveedores remotos:
+
+```text
+OPENAI_API_KEY
+OPENAI_BASE_URL   # opcional para proveedores OpenAI-compatible
+ANTHROPIC_API_KEY
+GOOGLE_API_KEY
+```
+
+Las API keys no se guardan en artefactos. Los artefactos conservan el mismo
+schema `llm_lab.experiment.v1` y registran solo `model_id`, estado, latencia,
+respuesta o error normalizado.
+
+Ejemplo mixto local/remoto:
+
+```bash
+OPENAI_API_KEY=... 
+  --mode ollama \
+  --stage1-models qwen,openai:gpt-4o \
+  --stage2-reviewers mistral,openai:gpt-4o \
+  --chairman openai:gpt-4o \
+  --input "Compara una respuesta local y una remota"
+```
+
 Restricciones:
 
 - este runner pertenece solo a `runtime_lab/llm_lab`
 - no llama al runtime de NUCLEO
 - no ejecuta tools
 - no decide politica
-- no introduce proveedores externos
+- no persiste API keys
+- no permite que un LLM ejecute tools ni controle el runtime de NUCLEO
