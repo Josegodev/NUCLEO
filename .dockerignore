@@ -1,0 +1,9 @@
+.git
+__pycache__/
+*.pyc
+.venv/
+venv/
+outputs/
+runtime_lab/
+docs/
+docs_esp/

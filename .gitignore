@@ -1,50 +1,50 @@
-# Python environment
+# Entorno virtual
 .venv/
 
-# Python cache/build output
+# Python cache
 __pycache__/
 *.pyc
 
-# Runtime logs and temporary files
+# Archivos temporales
 *.log
 *.tmp
-*.tmp.json
-*.jsonl
-!runtime_lab/document_loader/fixtures/*.jsonl
-runtime_lab/document_loader/pdf/
 
-# llm_lab generated artifacts
-runtime_lab/llm_lab/artifacts/*
-!runtime_lab/llm_lab/artifacts/.gitkeep
-
-# document_loader generated knowledge artifacts
-runtime_lab/knowledge_store/documents/
-runtime_lab/knowledge_store/manifests/
-runtime_lab/knowledge_store/llm_context/
-
-# External research repositories
-external/*
-!external/**/
-!external/**/*.md
-
-# Accidental Rust/Node build artifacts
-**/target/
-**/node_modules/
-
-# System/editor files
+# Sistema
 .DS_Store
 Thumbs.db
-.vscode/
 
-# Local scratch files
+# Archivos locales
 estructura.txt
+.vscode/
+.codex
+runtime_lab/recoleccion/data/
+runtime_lab/recoleccion/outputs/
+*.csv
+
+
+# Local SQLite memories
+*.db
+*.sqlite
+*.sqlite3
+
+# External repositories: keep local only
 external/
 
-runtime_lab/recoleccion/data/
-runtime_lab/recoleccion/outputs/
-*.csv
-runtime_lab/recoleccion/data/
-runtime_lab/recoleccion/outputs/
-*.csv
-runtime_lab/llm_lab/rag_nucleo_docs/.index/
+# Shimmy/local audit artifacts that should never be committed if copied accidentally
+**/target/
+**/target-gpu/
+**/__pycache__/
+**/*.stackdump
+**/*.rlib
+**/gpu-test-results*.json
+
+*runtime_lab/llm_lab/rag_nucleo_docs/.index/md_chunks_index.json
+
+# LLM lab artifacts
+runtime_lab/llm_lab/artifacts/
+runtime_lab/knowledge_store/
+runtime_lab/document_loader/pdf/
 outputs/
+
+# Zips
+*.zip
