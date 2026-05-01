@@ -24,6 +24,77 @@ from app.tools.registry import ToolRegistry
 from app.tools.registry import registry as default_registry
 
 
+def _strip_json_fence(raw: str) -> str:
+    normalized = raw.strip()
+    if not normalized.startswith("```"):
+        return normalized
+
+    lines = normalized.splitlines()
+    if len(lines) < 2:
+        raise ValueError("Invalid fenced JSON block from LLM output")
+
+    first_line = lines[0].strip()
+    if first_line not in {"```", "```json"}:
+        raise ValueError("Invalid fenced JSON block language from LLM output")
+
+    if lines[-1].strip() != "```":
+        raise ValueError("Invalid fenced JSON block closing marker from LLM output")
+
+    return "\n".join(lines[1:-1]).strip()
+
+
+def build_tool_contract_prompt(tool_registry: ToolRegistry) -> str:
+    lines = [
+        "Available tools and required argument schemas:",
+        "",
+    ]
+
+    for contract in sorted(tool_registry.list_contracts(), key=lambda item: item.name):
+        lines.append(f"- {contract.name}")
+        lines.append("  arguments:")
+        properties = contract.input_schema.get("properties", {})
+        required = set(contract.input_schema.get("required", []))
+        if not properties:
+            lines.append("    {}")
+            lines.append("")
+            continue
+
+        for field_name in sorted(properties):
+            field_schema = properties[field_name]
+            type_label = _schema_type_label(field_schema)
+            optional_label = "" if field_name in required else " (optional)"
+            lines.append(f"    {field_name}: {type_label}{optional_label}")
+        lines.append("")
+
+    lines.extend(
+        [
+            "Rules:",
+            "- Use ONLY listed tools.",
+            "- Use EXACT argument names.",
+            "- Do NOT invent fields.",
+            "- Do NOT use aliases.",
+            "- If no tool fits, return suggested_action=null and arguments={}.",
+            "- Output ONLY JSON, optionally fenced as ```json ... ```.",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _schema_type_label(schema: object) -> str:
+    if not isinstance(schema, dict):
+        return "unknown"
+
+    any_of = schema.get("anyOf")
+    if isinstance(any_of, list):
+        return " | ".join(_schema_type_label(item) for item in any_of)
+
+    schema_type = schema.get("type")
+    if isinstance(schema_type, str):
+        return schema_type
+
+    return "unknown"
+
+
 class LLMPlannerInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -50,11 +121,14 @@ class LLMPlanOutputValidator:
 
     def validate_raw_output(self, raw_output: str) -> AgentActionProposal:
         try:
-            decoded_output = json.loads(raw_output)
-        except (TypeError, json.JSONDecodeError) as exc:
+            decoded_output = json.loads(_strip_json_fence(raw_output))
+        except (TypeError, ValueError) as exc:
             raise ValueError("Invalid JSON from LLM output") from exc
 
         proposal = self._validate_shape(decoded_output)
+        if proposal.suggested_action is None:
+            return proposal
+
         tool_name = self._validate_tool_name(proposal.suggested_action)
 
         if self._tool_registry.get(tool_name) is None:
@@ -80,6 +154,16 @@ class LLMPlanOutputValidator:
         proposal: AgentActionProposal,
         metadata: dict[str, JsonValue] | None = None,
     ) -> PlannedAction:
+        if proposal.suggested_action is None:
+            return PlannedAction(
+                payload={},
+                status="no_plan",
+                confidence=proposal.confidence,
+                reason=f"LLM-assisted proposal returned no action: {proposal.intent}",
+                source="llm_assisted",
+                metadata=metadata or {},
+            )
+
         return PlannedAction(
             tool_name=proposal.suggested_action,
             payload=proposal.arguments,
@@ -96,13 +180,21 @@ class LLMPlanOutputValidator:
             raise ValueError("LLM output must be a JSON object")
 
         intent = LLMPlanOutputValidator._required_string(decoded_output, "intent")
-        suggested_action = LLMPlanOutputValidator._required_string(
-            decoded_output,
-            "suggested_action",
-        )
+        suggested_action_value = decoded_output.get("suggested_action")
+        if suggested_action_value is None:
+            suggested_action = None
+        else:
+            suggested_action = LLMPlanOutputValidator._required_string(
+                decoded_output,
+                "suggested_action",
+            )
         arguments = decoded_output.get("arguments")
         if not isinstance(arguments, dict):
             raise ValueError("LLM output field 'arguments' must be an object")
+        if suggested_action is None and arguments:
+            raise ValueError(
+                "LLM output with suggested_action=null must use empty arguments"
+            )
 
         confidence = decoded_output.get("confidence")
         if isinstance(confidence, bool) or not isinstance(confidence, int | float):
@@ -137,8 +229,13 @@ LLMProposalProvider = Callable[[LLMPlannerInput, AgentRequest], LLMProviderResul
 
 
 class ModelRouterProposalProvider:
-    def __init__(self, model_router: ModelRouter | None = None) -> None:
+    def __init__(
+        self,
+        model_router: ModelRouter | None = None,
+        tool_registry: ToolRegistry = default_registry,
+    ) -> None:
         self._model_router = model_router or ModelRouter()
+        self._tool_registry = tool_registry
 
     def __call__(
         self,
@@ -154,14 +251,13 @@ class ModelRouterProposalProvider:
             model_id=model_id,
         )
 
-    @staticmethod
-    def _build_prompt(llm_input: LLMPlannerInput) -> str:
+    def _build_prompt(self, llm_input: LLMPlannerInput) -> str:
         return "\n".join(
             [
                 "You are augmenting the NUCLEO Planner.",
                 "Return JSON only, with exactly these fields:",
-                '{"intent": string, "suggested_action": string, "arguments": object, "confidence": number}',
-                "Allowed suggested_action values: echo, disk_info, system_info.",
+                '{"intent": string, "suggested_action": string | null, "arguments": object, "confidence": number}',
+                build_tool_contract_prompt(self._tool_registry),
                 "Do not execute tools.",
                 "Do not authorize actions.",
                 "The PolicyEngine and ToolRegistry will validate the proposal.",
@@ -227,6 +323,7 @@ class LLMAssistedPlannerStrategy:
                 raw_output=raw_output,
                 router_result=router_result,
                 fallback_reason=None,
+                request=request,
             )
             plan = self._validator.to_planned_action(proposal, metadata=metadata)
         except Exception as exc:
@@ -306,6 +403,7 @@ class LLMAssistedPlannerStrategy:
             raw_output=raw_output,
             router_result=router_result,
             fallback_reason=fallback_reason,
+            request=request,
         )
         return plan.model_copy(update={"metadata": metadata})
 
@@ -327,13 +425,18 @@ class LLMAssistedPlannerStrategy:
         raw_output: str | None,
         router_result: dict[str, JsonValue] | None,
         fallback_reason: str | None,
+        request: AgentRequest | None = None,
     ) -> dict[str, JsonValue]:
         metadata: dict[str, JsonValue] = {
+            "augmentation_attempted": True,
             "proposal": LLMAssistedPlannerStrategy._proposal_to_dict(proposal),
             "model_output": raw_output or "",
             "fallback_used": fallback_reason is not None,
             "fallback_reason": fallback_reason,
         }
+        if request and request.options:
+            metadata["backend"] = request.options.backend.value
+            metadata["model_id"] = request.options.model_id
         if router_result:
             for key in (
                 "model_used",
@@ -346,7 +449,11 @@ class LLMAssistedPlannerStrategy:
                     metadata[key] = router_result[key]
             if fallback_reason is not None:
                 metadata["fallback_used"] = True
-                metadata["fallback_reason"] = fallback_reason
+                router_reason = router_result.get("fallback_reason")
+                if isinstance(router_reason, str) and router_reason:
+                    metadata["fallback_reason"] = f"{router_reason}; {fallback_reason}"
+                else:
+                    metadata["fallback_reason"] = fallback_reason
         return metadata
 
     @staticmethod

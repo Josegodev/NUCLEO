@@ -42,6 +42,11 @@ class CountingPlanner:
         )
 
 
+class FailingPlanner:
+    def create_plan(self, request: AgentRequest) -> PlannedAction:
+        raise AssertionError("approve must not call Planner or LLM")
+
+
 class CountingPolicyEngine:
     def __init__(self, decisions: list[PolicyDecisionValue] | None = None) -> None:
         self.calls = 0
@@ -183,6 +188,27 @@ class ApprovalGateTests(unittest.TestCase):
             self.assertEqual(approval.execution_state, ExecutionState.EXECUTED)
             self.assertEqual(planner.calls, 1)
             self.assertEqual(tool.calls, 1)
+
+    def test_approve_does_not_call_planner_or_llm_provider(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            store = ApprovalStore(tmpdir)
+            proposal_runtime, _, _, _ = self.make_runtime(store)
+            response = proposal_runtime.run(proposal_request(), context())
+            approval_runtime = AgentRuntime(
+                runtime_planner=FailingPlanner(),
+                runtime_policy_engine=CountingPolicyEngine(),
+                tool_registry=StaticRegistry(SpyEchoTool()),
+                runtime_tracer=tracer(),
+                runtime_approval_store=store,
+            )
+
+            approval = approval_runtime.approve(
+                response.trace_id,
+                approved=True,
+                context=context(),
+            )
+
+            self.assertEqual(approval.execution_state, ExecutionState.EXECUTED)
 
     def test_approve_reevaluates_policy_engine(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

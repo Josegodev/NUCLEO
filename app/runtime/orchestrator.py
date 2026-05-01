@@ -49,6 +49,7 @@ from app.schemas.responses import (
 from app.runtime.planner import Planner
 from app.runtime.planner_augmentation import (
     LLMAssistedPlannerStrategy,
+    LLMPlanOutputValidator,
     ModelRouterProposalProvider,
 )
 from app.runtime.tracing import ExecutionStep, ExecutionTrace, InMemoryTracer, Tracer
@@ -60,7 +61,8 @@ from app.services.approval.approval_store import ApprovalStore
 planner = Planner(
     strategy=LLMAssistedPlannerStrategy(
         enabled=True,
-        proposal_provider=ModelRouterProposalProvider(),
+        proposal_provider=ModelRouterProposalProvider(tool_registry=registry),
+        validator=LLMPlanOutputValidator(tool_registry=registry),
     )
 )
 policy_engine = PolicyEngine(tool_registry=registry)
@@ -134,6 +136,7 @@ class AgentRuntime:
                 code=ExecutionErrorCode.NO_PLAN,
                 message=plan.reason,
                 trace_id=trace_id,
+                result=self._plan_metadata_result(plan),
             )
 
         tool_name = plan.tool_name
@@ -253,6 +256,7 @@ class AgentRuntime:
                 "payload": tool_payload,
             }
             result.update(plan.metadata)
+            result["metadata"] = plan.metadata
             if self._should_persist_approval_proposal(request):
                 self._approval_store.save_proposal(
                     trace_id=trace_id,
@@ -548,6 +552,15 @@ class AgentRuntime:
             errors=[ExecutionError(code=code, message=message)],
             trace_id=trace_id,
         )
+
+    @staticmethod
+    def _plan_metadata_result(plan: PlannedAction) -> dict | None:
+        if not plan.metadata:
+            return None
+        return {
+            **plan.metadata,
+            "metadata": plan.metadata,
+        }
 
     def _safe_start_trace(self, request_id: str | None) -> ExecutionTrace:
         try:

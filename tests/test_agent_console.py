@@ -10,7 +10,10 @@ from app.policies.models import (
 )
 from app.runtime.orchestrator import AgentRuntime
 from app.runtime.planner import Planner
-from app.runtime.planner_augmentation import LLMAssistedPlannerStrategy
+from app.runtime.planner_augmentation import (
+    LLMAssistedPlannerStrategy,
+    ModelRouterProposalProvider,
+)
 from app.runtime.tracing import InMemoryTracer
 from app.schemas.context import ExecutionContext
 from app.schemas.requests import AgentBackend, AgentRequest
@@ -99,6 +102,43 @@ def console_request(dry_run: bool = True) -> AgentRequest:
     )
 
 
+def openai_console_request(message: str = "haz echo de hola") -> AgentRequest:
+    return AgentRequest.model_validate(
+        {
+            "input": message,
+            "context": {},
+            "options": {
+                "backend": "openai",
+                "model_id": "gpt-4o-mini",
+                "agent_mode": "proposal_only",
+                "dry_run": True,
+            },
+        }
+    )
+
+
+class RecordingModelRouter:
+    def __init__(self) -> None:
+        self.calls = []
+
+    def generate(self, prompt: str, backend, model_id: str | None) -> dict:
+        self.calls.append(
+            {
+                "prompt": prompt,
+                "backend": backend,
+                "model_id": model_id,
+            }
+        )
+        return {
+            "output": valid_echo_output(),
+            "model_used": model_id or "missing",
+            "backend_used": getattr(backend, "value", backend),
+            "latency_ms": 1.0,
+            "fallback_used": False,
+            "fallback_reason": None,
+        }
+
+
 class AgentConsoleTests(unittest.TestCase):
     def test_console_contract_maps_input_options_and_forces_dry_run(self) -> None:
         request = console_request(dry_run=False)
@@ -107,6 +147,30 @@ class AgentConsoleTests(unittest.TestCase):
         self.assertEqual(request.options.backend, AgentBackend.AUTO)
         self.assertTrue(request.dry_run)
         self.assertTrue(request.options.dry_run)
+
+    def test_agent_request_preserves_openai_options(self) -> None:
+        request = openai_console_request()
+
+        self.assertEqual(request.user_input, "haz echo de hola")
+        self.assertEqual(request.options.backend, AgentBackend.OPENAI)
+        self.assertEqual(request.options.model_id, "gpt-4o-mini")
+        self.assertEqual(request.options.agent_mode.value, "proposal_only")
+        self.assertTrue(request.dry_run)
+
+    def test_backend_openai_calls_model_router(self) -> None:
+        model_router = RecordingModelRouter()
+        strategy = LLMAssistedPlannerStrategy(
+            enabled=True,
+            proposal_provider=ModelRouterProposalProvider(model_router),
+        )
+
+        plan = Planner(strategy=strategy).create_plan(openai_console_request())
+
+        self.assertEqual(plan.source, "llm_assisted")
+        self.assertEqual(model_router.calls[0]["backend"], AgentBackend.OPENAI)
+        self.assertEqual(model_router.calls[0]["model_id"], "gpt-4o-mini")
+        self.assertEqual(plan.metadata["backend_used"], "openai")
+        self.assertTrue(plan.metadata["augmentation_attempted"])
 
     def test_proposal_only_does_not_execute_tool_and_invokes_policy(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -216,6 +280,39 @@ class AgentConsoleTests(unittest.TestCase):
         self.assertEqual(plan.source, "rule:system_info")
         self.assertTrue(plan.metadata["fallback_used"])
         self.assertEqual(plan.metadata["proposal"]["suggested_action"], "system_info")
+
+    def test_no_plan_includes_augmentation_metadata_when_llm_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            policy_engine = CountingPolicyEngine()
+            runtime = AgentRuntime(
+                runtime_planner=Planner(
+                    strategy=LLMAssistedPlannerStrategy(
+                        enabled=True,
+                        proposal_provider=lambda llm_input, request: {
+                            "output": "",
+                            "model_used": "gpt-4o-mini",
+                            "backend_used": "openai",
+                            "latency_ms": 1.0,
+                            "fallback_used": False,
+                            "fallback_reason": "OPENAI_API_KEY is not configured.",
+                        },
+                    )
+                ),
+                runtime_policy_engine=policy_engine,
+                tool_registry=SpyRegistry(SpyEchoTool()),
+                runtime_tracer=tracer(),
+                runtime_approval_store=ApprovalStore(tmpdir),
+            )
+
+            response = runtime.run(openai_console_request(), context())
+
+        self.assertEqual(response.status, ExecutionStatus.REJECTED)
+        self.assertEqual(response.errors[0].code.value, "no_plan")
+        self.assertEqual(policy_engine.calls, 0)
+        self.assertTrue(response.result["augmentation_attempted"])
+        self.assertTrue(response.result["metadata"]["fallback_used"])
+        self.assertIn("OPENAI_API_KEY", response.result["metadata"]["fallback_reason"])
+        self.assertIn("Invalid JSON", response.result["metadata"]["fallback_reason"])
 
     def test_tool_registry_does_not_execute_tool(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

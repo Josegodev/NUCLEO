@@ -8,7 +8,7 @@ class AgentActionProposal:
     """Structured action proposal produced by Planner augmentation."""
 
     intent: str
-    suggested_action: str
+    suggested_action: str | None
     arguments: dict[str, Any]
     confidence: float
 

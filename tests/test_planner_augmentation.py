@@ -11,6 +11,7 @@ from app.runtime.planner import DeterministicPlannerStrategy, Planner
 from app.runtime.planner_augmentation import (
     LLMAssistedPlannerStrategy,
     LLMPlanOutputValidator,
+    build_tool_contract_prompt,
 )
 from app.runtime.tracing import InMemoryTracer
 from app.schemas.context import ExecutionContext
@@ -18,6 +19,7 @@ from app.schemas.execution import PlannedAction
 from app.schemas.requests import AgentRequest, AgentRunOptions
 from app.schemas.responses import ExecutionStatus
 from app.tools.local.echo_tool import EchoTool
+from app.tools.registry import registry as production_registry
 
 
 class SpyEchoTool(EchoTool):
@@ -85,6 +87,15 @@ def tracer() -> InMemoryTracer:
 
 def llm_output(payload: dict) -> str:
     return json.dumps(payload)
+
+
+def valid_echo_payload() -> dict:
+    return {
+        "intent": "echo was requested",
+        "suggested_action": "echo",
+        "arguments": {"text": "hola"},
+        "confidence": 0.91,
+    }
 
 
 def augmented_request(user_input: str, dry_run: bool = True) -> AgentRequest:
@@ -165,6 +176,34 @@ class PlannerAugmentationTests(unittest.TestCase):
         self.assertFalse(strategy.audit_records[0].accepted)
         self.assertIn("payload", strategy.audit_records[0].fallback_reason)
 
+    def test_tool_contract_prompt_includes_real_echo_text_argument(self) -> None:
+        prompt = build_tool_contract_prompt(production_registry)
+
+        self.assertIn("- echo", prompt)
+        self.assertIn("text: string", prompt)
+        self.assertNotIn("message:", prompt)
+        self.assertIn("Use EXACT argument names.", prompt)
+
+    def test_llm_strategy_rejects_echo_message_argument_and_falls_back(self) -> None:
+        strategy = LLMAssistedPlannerStrategy(
+            enabled=True,
+            proposal_provider=lambda llm_input, request: llm_output(
+                {
+                    "intent": "echo was requested",
+                    "suggested_action": "echo",
+                    "arguments": {"message": "hola"},
+                    "confidence": 0.91,
+                }
+            ),
+        )
+
+        result = Planner(strategy=strategy).create_plan(augmented_request("system info"))
+
+        self.assertEqual(result.source, "rule:system_info")
+        self.assertTrue(result.metadata["fallback_used"])
+        self.assertIn("message", result.metadata["fallback_reason"])
+        self.assertFalse(strategy.audit_records[0].accepted)
+
     def test_llm_strategy_rejects_incomplete_output_and_falls_back(self) -> None:
         strategy = LLMAssistedPlannerStrategy(
             enabled=True,
@@ -183,19 +222,90 @@ class PlannerAugmentationTests(unittest.TestCase):
         self.assertFalse(strategy.audit_records[0].accepted)
         self.assertIn("confidence", strategy.audit_records[0].fallback_reason)
 
+    def test_output_validator_accepts_plain_json(self) -> None:
+        proposal = LLMPlanOutputValidator().validate_raw_output(
+            llm_output(valid_echo_payload())
+        )
+
+        self.assertEqual(proposal.suggested_action, "echo")
+        self.assertEqual(proposal.arguments, {"text": "hola"})
+
+    def test_output_validator_accepts_null_suggested_action_as_no_action(self) -> None:
+        strategy = LLMAssistedPlannerStrategy(
+            enabled=True,
+            proposal_provider=lambda llm_input, request: llm_output(
+                {
+                    "intent": "no registered tool fits",
+                    "suggested_action": None,
+                    "arguments": {},
+                    "confidence": 0.2,
+                }
+            ),
+        )
+
+        result = Planner(strategy=strategy).create_plan(
+            augmented_request("unmatched user goal")
+        )
+
+        self.assertEqual(result.status, "no_plan")
+        self.assertEqual(result.source, "llm_assisted")
+        self.assertFalse(result.metadata["fallback_used"])
+        self.assertIsNone(result.metadata["proposal"]["suggested_action"])
+        self.assertTrue(strategy.audit_records[0].accepted)
+
+    def test_echo_tool_still_rejects_message_argument(self) -> None:
+        with self.assertRaises(Exception):
+            EchoTool().validate_input({"message": "hola"})
+
+    def test_output_validator_accepts_json_fenced_block(self) -> None:
+        proposal = LLMPlanOutputValidator().validate_raw_output(
+            "```json\n" + llm_output(valid_echo_payload()) + "\n```"
+        )
+
+        self.assertEqual(proposal.suggested_action, "echo")
+        self.assertEqual(proposal.arguments, {"text": "hola"})
+
+    def test_output_validator_accepts_plain_fenced_block(self) -> None:
+        proposal = LLMPlanOutputValidator().validate_raw_output(
+            "```\n" + llm_output(valid_echo_payload()) + "\n```"
+        )
+
+        self.assertEqual(proposal.suggested_action, "echo")
+        self.assertEqual(proposal.arguments, {"text": "hola"})
+
+    def test_output_validator_rejects_text_mixed_with_json(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Invalid JSON"):
+            LLMPlanOutputValidator().validate_raw_output(
+                "Here is the proposal:\n" + llm_output(valid_echo_payload())
+            )
+
+    def test_output_validator_rejects_unclosed_fenced_block(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Invalid JSON"):
+            LLMPlanOutputValidator().validate_raw_output(
+                "```json\n" + llm_output(valid_echo_payload())
+            )
+
+    def test_fenced_valid_proposal_does_not_activate_fallback(self) -> None:
+        strategy = LLMAssistedPlannerStrategy(
+            enabled=True,
+            proposal_provider=lambda llm_input, request: (
+                "```json\n" + llm_output(valid_echo_payload()) + "\n```"
+            ),
+        )
+
+        result = Planner(strategy=strategy).create_plan(augmented_request("say hola"))
+
+        self.assertEqual(result.source, "llm_assisted")
+        self.assertFalse(result.metadata["fallback_used"])
+        self.assertIsNone(result.metadata["fallback_reason"])
+        self.assertTrue(strategy.audit_records[0].accepted)
+
     def test_llm_strategy_returns_valid_planned_action_when_output_is_valid(
         self,
     ) -> None:
         strategy = LLMAssistedPlannerStrategy(
             enabled=True,
-            proposal_provider=lambda llm_input, request: llm_output(
-                {
-                    "intent": "echo was requested",
-                    "suggested_action": "echo",
-                    "arguments": {"text": "hola"},
-                    "confidence": 0.91,
-                }
-            ),
+            proposal_provider=lambda llm_input, request: llm_output(valid_echo_payload()),
         )
 
         result = Planner(strategy=strategy).create_plan(augmented_request("say hola"))
