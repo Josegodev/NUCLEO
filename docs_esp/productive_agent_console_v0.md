@@ -85,12 +85,83 @@ Planner proposal -> PolicyEngine -> ToolRegistry -> dry_run skip
 
 Aunque `PolicyEngine` devuelva `ALLOW`, `dry_run=true` evita `tool.run`.
 
+## Approval Gate real
+
+La consola v0 tiene dos pasos separados:
+
+```text
+proposal_only + dry_run=true -> PROPOSED
+approve=true                -> APPROVED -> EXECUTED
+approve=false               -> REJECTED
+```
+
+`proposal_only` no ejecuta. Solo produce una propuesta validada por el runtime y la persiste asociada a `trace_id`.
+
+La persistencia guarda:
+
+- `trace_id`
+- `user_input`
+- `planned_action`
+- `proposed_tool`
+- `arguments`
+- `policy_decision_initial`
+- `created_at`
+- `execution_state = PROPOSED`
+
+El endpoint de aprobación es:
+
+```text
+POST /agent/approve
+```
+
+Request:
+
+```json
+{
+  "trace_id": "trace-...",
+  "approved": true
+}
+```
+
+Reglas del gate:
+
+- `approve` no llama al LLM.
+- `approve` no llama al Planner.
+- `approve` no acepta `tool_name`.
+- `approve` no acepta `payload`.
+- `approve` recupera la proposal persistida por `trace_id`.
+- `approve` reconstruye el `PlannedAction` persistido.
+- `approve` vuelve a ejecutar `PolicyEngine`.
+- Si `PolicyEngine` devuelve `DENY`, el estado pasa a `DENIED` y no se ejecuta nada.
+- Si el payload no valida contra el contrato de la tool, el estado pasa a `ERROR` y no se ejecuta nada.
+- Si todo valida, `ToolRegistry` resuelve la tool y solo entonces se llama `tool.run`.
+- `reject` pasa a `REJECTED` y nunca ejecuta.
+
+La idempotencia es crítica:
+
+- Si una proposal ya está `EXECUTED`, una segunda aprobación devuelve el estado existente.
+- Una segunda aprobación no vuelve a llamar `tool.run`.
+
+Estados posibles:
+
+```text
+PROPOSED
+APPROVED
+EXECUTED
+REJECTED
+DENIED
+ERROR
+```
+
 ## Approval Gate
 
-En esta versión no hay aprobación de ejecución real desde la UI. El approval gate queda representado por dos barreras:
+La aprobación real vive en `/agent/approve`. El gate queda representado por estas barreras:
 
 - `PolicyEngine`: decide `ALLOW` o `DENY`.
-- `dry_run=true`: bloquea ejecución aunque la política permita la acción.
+- `dry_run=true`: bloquea ejecución durante la propuesta.
+- `ApprovalStore`: exige que exista una proposal persistida por `trace_id`.
+- `ToolRegistry`: resuelve de nuevo la tool antes de ejecutar.
+- `tool.validate_input`: valida de nuevo el payload persistido antes de `tool.run`.
 
 ## Observabilidad
 

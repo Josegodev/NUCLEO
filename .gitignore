@@ -42,6 +42,7 @@ external/
 
 # LLM lab artifacts
 runtime_lab/llm_lab/artifacts/
+runtime_lab/approvals/
 runtime_lab/knowledge_store/
 runtime_lab/document_loader/pdf/
 outputs/

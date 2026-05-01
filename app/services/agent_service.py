@@ -26,6 +26,7 @@ Evolución prevista:
 """
 
 from app.schemas.context import ExecutionContext
+from app.schemas.approval import ApprovalRequest, ApprovalResponse
 from app.schemas.requests import AgentRequest
 from app.schemas.responses import AgentResponse
 from app.runtime.orchestrator import AgentRuntime
@@ -37,3 +38,14 @@ class AgentService:
 
     def run(self, request: AgentRequest, context: ExecutionContext) -> AgentResponse:
         return self.runtime.run(request, context)
+
+    def approve(
+        self,
+        request: ApprovalRequest,
+        context: ExecutionContext,
+    ) -> ApprovalResponse:
+        return self.runtime.approve(
+            trace_id=request.trace_id,
+            approved=request.approved,
+            context=context,
+        )

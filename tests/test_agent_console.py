@@ -1,4 +1,5 @@
 import json
+import tempfile
 import unittest
 
 from app.adapters.model_router import ModelBackendCall, ModelRouter
@@ -14,6 +15,7 @@ from app.runtime.tracing import InMemoryTracer
 from app.schemas.context import ExecutionContext
 from app.schemas.requests import AgentBackend, AgentRequest
 from app.schemas.responses import ExecutionStatus
+from app.services.approval.approval_store import ApprovalStore
 from app.tools.local.echo_tool import EchoTool
 
 
@@ -107,22 +109,24 @@ class AgentConsoleTests(unittest.TestCase):
         self.assertTrue(request.options.dry_run)
 
     def test_proposal_only_does_not_execute_tool_and_invokes_policy(self) -> None:
-        tool = SpyEchoTool()
-        registry = SpyRegistry(tool)
-        policy_engine = CountingPolicyEngine()
-        runtime = AgentRuntime(
-            runtime_planner=Planner(
-                strategy=LLMAssistedPlannerStrategy(
-                    enabled=True,
-                    proposal_provider=lambda llm_input, request: valid_echo_output(),
-                )
-            ),
-            runtime_policy_engine=policy_engine,
-            tool_registry=registry,
-            runtime_tracer=tracer(),
-        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tool = SpyEchoTool()
+            registry = SpyRegistry(tool)
+            policy_engine = CountingPolicyEngine()
+            runtime = AgentRuntime(
+                runtime_planner=Planner(
+                    strategy=LLMAssistedPlannerStrategy(
+                        enabled=True,
+                        proposal_provider=lambda llm_input, request: valid_echo_output(),
+                    )
+                ),
+                runtime_policy_engine=policy_engine,
+                tool_registry=registry,
+                runtime_tracer=tracer(),
+                runtime_approval_store=ApprovalStore(tmpdir),
+            )
 
-        response = runtime.run(console_request(dry_run=False), context())
+            response = runtime.run(console_request(dry_run=False), context())
 
         self.assertEqual(response.status, ExecutionStatus.SUCCESS)
         self.assertEqual(policy_engine.calls, 1)
@@ -132,20 +136,22 @@ class AgentConsoleTests(unittest.TestCase):
         self.assertEqual(response.result["proposal"]["suggested_action"], "echo")
 
     def test_dry_run_true_prevents_tool_execution(self) -> None:
-        tool = SpyEchoTool()
-        runtime = AgentRuntime(
-            runtime_planner=Planner(
-                strategy=LLMAssistedPlannerStrategy(
-                    enabled=True,
-                    proposal_provider=lambda llm_input, request: valid_echo_output(),
-                )
-            ),
-            runtime_policy_engine=CountingPolicyEngine(),
-            tool_registry=SpyRegistry(tool),
-            runtime_tracer=tracer(),
-        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tool = SpyEchoTool()
+            runtime = AgentRuntime(
+                runtime_planner=Planner(
+                    strategy=LLMAssistedPlannerStrategy(
+                        enabled=True,
+                        proposal_provider=lambda llm_input, request: valid_echo_output(),
+                    )
+                ),
+                runtime_policy_engine=CountingPolicyEngine(),
+                tool_registry=SpyRegistry(tool),
+                runtime_tracer=tracer(),
+                runtime_approval_store=ApprovalStore(tmpdir),
+            )
 
-        response = runtime.run(console_request(dry_run=True), context())
+            response = runtime.run(console_request(dry_run=True), context())
 
         self.assertEqual(response.status, ExecutionStatus.SUCCESS)
         self.assertEqual(response.result["dry_run"], True)
@@ -212,21 +218,23 @@ class AgentConsoleTests(unittest.TestCase):
         self.assertEqual(plan.metadata["proposal"]["suggested_action"], "system_info")
 
     def test_tool_registry_does_not_execute_tool(self) -> None:
-        tool = SpyEchoTool()
-        registry = SpyRegistry(tool)
-        runtime = AgentRuntime(
-            runtime_planner=Planner(
-                strategy=LLMAssistedPlannerStrategy(
-                    enabled=True,
-                    proposal_provider=lambda llm_input, request: valid_echo_output(),
-                )
-            ),
-            runtime_policy_engine=CountingPolicyEngine(),
-            tool_registry=registry,
-            runtime_tracer=tracer(),
-        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tool = SpyEchoTool()
+            registry = SpyRegistry(tool)
+            runtime = AgentRuntime(
+                runtime_planner=Planner(
+                    strategy=LLMAssistedPlannerStrategy(
+                        enabled=True,
+                        proposal_provider=lambda llm_input, request: valid_echo_output(),
+                    )
+                ),
+                runtime_policy_engine=CountingPolicyEngine(),
+                tool_registry=registry,
+                runtime_tracer=tracer(),
+                runtime_approval_store=ApprovalStore(tmpdir),
+            )
 
-        runtime.run(console_request(), context())
+            runtime.run(console_request(), context())
 
         self.assertGreater(registry.get_calls, 0)
         self.assertEqual(tool.calls, 0)

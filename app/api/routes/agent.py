@@ -33,6 +33,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, HTTPException
 
 from app.api.deps.auth import get_execution_context
+from app.schemas.approval import ApprovalRequest, ApprovalResponse
 from app.schemas.context import ExecutionContext
 from app.schemas.requests import AgentRequest
 from app.schemas.responses import AgentResponse
@@ -91,3 +92,11 @@ def run_agent(
         response = agent_service.run(request, idempotent_context)
         _IDEMPOTENCY_CACHE[cache_key] = response.model_copy(deep=True)
         return response
+
+
+@router.post("/approve", response_model=ApprovalResponse)
+def approve_agent_action(
+    request: ApprovalRequest,
+    context: ExecutionContext = Depends(get_execution_context),
+):
+    return agent_service.approve(request, context)

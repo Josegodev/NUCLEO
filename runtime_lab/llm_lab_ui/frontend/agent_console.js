@@ -6,6 +6,9 @@ const proposalOutput = document.getElementById('proposal-output');
 const rawOutput = document.getElementById('raw-output');
 const messageLine = document.getElementById('message-line');
 const runButton = document.getElementById('run-button');
+const approvalActions = document.getElementById('approval-actions');
+const approveButton = document.getElementById('approve-button');
+const rejectButton = document.getElementById('reject-button');
 
 const fields = {
   apiBase: document.getElementById('api-base'),
@@ -17,6 +20,8 @@ const fields = {
   modelUsed: document.getElementById('model-used'),
   latencyMs: document.getElementById('latency-ms'),
 };
+
+let lastAgentResponse = null;
 
 function setPill(element, text, state = '') {
   element.className = `pill ${state}`.trim();
@@ -44,6 +49,13 @@ function requestPayload() {
   };
 }
 
+function approvalPayload(approved) {
+  return {
+    trace_id: lastAgentResponse.trace_id,
+    approved,
+  };
+}
+
 function persistForm() {
   localStorage.setItem('agent_console.api_base', fields.apiBase.value);
   localStorage.setItem('agent_console.api_key', fields.apiKey.value);
@@ -59,6 +71,7 @@ function restoreForm() {
 }
 
 function renderResult(result) {
+  lastAgentResponse = result;
   const body = result.result || {};
   const state = result.status === 'success' ? 'success' : result.status;
   setPill(statusPill, result.status || 'unknown', state);
@@ -74,9 +87,24 @@ function renderResult(result) {
   fields.backendUsed.textContent = body.backend_used || '-';
   fields.modelUsed.textContent = body.model_used || '-';
   fields.latencyMs.textContent = body.latency_ms ?? '-';
+  updateApprovalActions();
+}
+
+function renderApproval(result) {
+  setPill(statusPill, result.execution_state || result.status || 'unknown', result.status);
+  setPill(responseStatus, result.status || 'unknown', result.status);
+  responseOutput.textContent = pretty({
+    execution_state: result.execution_state,
+    executed: result.executed,
+    tool: result.tool,
+    reason: result.reason,
+  });
+  rawOutput.textContent = pretty(result);
+  approvalActions.classList.add('hidden');
 }
 
 function renderError(error) {
+  lastAgentResponse = null;
   setPill(statusPill, 'error', 'error');
   setPill(responseStatus, 'error', 'error');
   responseOutput.textContent = error.message;
@@ -85,6 +113,49 @@ function renderError(error) {
   fields.backendUsed.textContent = '-';
   fields.modelUsed.textContent = '-';
   fields.latencyMs.textContent = '-';
+  approvalActions.classList.add('hidden');
+}
+
+function updateApprovalActions() {
+  const body = lastAgentResponse?.result || {};
+  const canApprove = Boolean(
+    lastAgentResponse?.trace_id
+      && body.proposal
+      && body.executed === false
+      && body.execution_allowed === false,
+  );
+  approvalActions.classList.toggle('hidden', !canApprove);
+}
+
+async function submitApproval(approved) {
+  if (!lastAgentResponse?.trace_id) return;
+
+  approveButton.disabled = true;
+  rejectButton.disabled = true;
+  messageLine.textContent = approved ? 'Approving...' : 'Rejecting...';
+
+  try {
+    const response = await fetch(`${fields.apiBase.value.replace(/\/+$/, '')}/agent/approve`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${fields.apiKey.value}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(approvalPayload(approved)),
+    });
+    const text = await response.text();
+    const body = text ? JSON.parse(text) : {};
+    if (!response.ok) {
+      throw new Error(body.detail || text || `HTTP ${response.status}`);
+    }
+    renderApproval(body);
+    messageLine.textContent = `approval state: ${body.execution_state || '-'}`;
+  } catch (error) {
+    messageLine.textContent = error.message;
+  } finally {
+    approveButton.disabled = false;
+    rejectButton.disabled = false;
+  }
 }
 
 form.addEventListener('submit', async (event) => {
@@ -118,5 +189,8 @@ form.addEventListener('submit', async (event) => {
     runButton.disabled = false;
   }
 });
+
+approveButton.addEventListener('click', () => submitApproval(true));
+rejectButton.addEventListener('click', () => submitApproval(false));
 
 restoreForm();

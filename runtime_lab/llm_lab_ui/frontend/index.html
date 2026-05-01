@@ -132,6 +132,29 @@
         opacity: 0.6;
       }
 
+      .approval-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .approval-actions button {
+        width: auto;
+        min-width: 92px;
+        margin-top: 0;
+        padding: 8px 12px;
+      }
+
+      .approval-actions button.secondary {
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--text);
+      }
+
+      .approval-actions.hidden {
+        display: none;
+      }
+
       .row {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -292,6 +315,10 @@
         <section>
           <div class="toolbar">
             <h2>Response</h2>
+            <div class="approval-actions hidden" id="approval-actions">
+              <button id="approve-button" type="button">Approve</button>
+              <button id="reject-button" type="button" class="secondary">Reject</button>
+            </div>
             <span id="response-status" class="pill">pending</span>
           </div>
           <pre id="response-output"></pre>
