@@ -69,8 +69,7 @@ Request
 - `ToolRegistry` es la fuente de verdad de tools ejecutables.
 - `PolicyEngine` autoriza la ejecución según autenticación, rol y nombre de tool.
 - `Tool` ejecuta la acción real.
-- `AgentResponse` devuelve un artefacto estructurado con `status`, `result`,
-  `errors`, `trace_id` y `version`.
+- `AgentResponse` devuelve `status`, `message` y `result` opcional.
 
 ## Estado actual del runtime
 
@@ -89,12 +88,6 @@ Request
   - `disk_info`
 - Resultado estructurado conservado en `AgentResponse.result`
 - Fase HARDENING en curso:
-  - contratos de artefactos explícitos para acción, policy, tools y resultado
-  - `PolicyDecision` estricto con enum y `extra="forbid"`
-  - `PlannedAction` versionado como artefacto de acción
-  - `ToolContractArtifact` obligatorio para registrar tools
-  - estados de ejecución cerrados: `success`, `error`, `rejected`
-  - `AgentResponse.message` eliminado como contrato público
   - contratos runtime-policy-registry más explícitos
   - Planner devuelve `planned` o `no_plan`
   - `no_plan` no ejecuta tools
@@ -145,6 +138,7 @@ Propósito:
 
 - experimentación multi-modelo fuera del runtime principal
 - ejecución local con modelos disponibles vía Ollama
+- ejecución remota opcional en experimentos mediante `model_id` prefijado
 - conservación de resultados como artefactos JSON versionados
 - validación explícita de errores, rankings y síntesis
 
@@ -195,6 +189,30 @@ python runtime_lab/llm_lab/experiment_runner.py \
   --input "Explica el contrato de artefactos de llm_lab"
 ```
 
+El mismo modo `ollama` se conserva como ruta de ejecución real por
+compatibilidad. `model_adapter.py` infiere el proveedor desde el `model_id`:
+
+```text
+qwen                 -> Ollama local
+mistral              -> Ollama local
+llama3.1:8b          -> Ollama local
+openai:gpt-4o        -> OpenAI-compatible
+a-... -> Anthropic
+google:gemini-...    -> Google
+```
+
+Las claves remotas se leen solo desde variables de entorno:
+
+```text
+OPENAI_API_KEY
+OPENAI_BASE_URL   # opcional
+ANTHROPIC_API_KEY
+GOOGLE_API_KEY
+```
+
+Estas claves no se guardan en artefactos. El schema de artefacto sigue siendo
+`llm_lab.experiment.v1`.
+
 ### llm_lab UI
 
 `runtime_lab/llm_lab_ui/` contiene una UI local opcional para lanzar
@@ -207,7 +225,8 @@ La UI:
 - no llama al runtime de NUCLEO
 - no ejecuta tools
 - no decide política
-- no integra proveedores externos
+- puede enviar IDs remotos prefijados al runner de `llm_lab`
+- no permite que un LLM ejecute tools ni controle el runtime
 
 Arranque local:
 
@@ -278,10 +297,9 @@ Métodos permitidos: `GET`, `POST`, `OPTIONS`.
 
 Headers permitidos: `Authorization`, `Content-Type`.
 
-Nota de trazabilidad: `AgentResponse` expone `trace_id` como parte del contrato
-de resultado de ejecución. No expone `request_id` top-level; algunas tools
-pueden incluirlo dentro de `result`, pero no es parte garantizada del contrato
-público.
+Nota de trazabilidad: `AgentResponse` no expone actualmente un `request_id`
+top-level. Algunas tools pueden incluirlo dentro de `result`, pero no es parte
+garantizada del contrato público.
 
 ### External audits
 
@@ -360,22 +378,16 @@ curl -X POST http://127.0.0.1:8000/agent/run \
 
 ```json
 {
-  "status": "success",
+  "status": "dry_run_success",
+  "message": "{'dry_run': True, 'executed': False, 'tool': 'system_info', 'payload': {}}",
   "result": {
     "dry_run": true,
     "executed": false,
     "tool": "system_info",
     "payload": {}
-  },
-  "errors": [],
-  "trace_id": "trace-<request_id>",
-  "version": "execution_result.v1"
+  }
 }
 ```
-
-Breaking change: `AgentResponse.message` ya no es contrato público principal.
-El contrato estable es `status`, `result`, `errors`, `trace_id` y `version`.
-Los únicos estados públicos cerrados son `success`, `error` y `rejected`.
 
 En `dry_run=true`, el runtime ejecuta Planner, PolicyEngine y ToolRegistry,
 pero no llama a `Tool.run(...)`. La respuesta indica la tool que se habría

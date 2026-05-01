@@ -1,65 +1,112 @@
-"""Chunk Markdown files by level 1-3 headings."""
+"""Chunk Markdown files by headings for lexical retrieval.
+
+Chunks preserve source file, heading and line range so answers can cite evidence.
+"""
 
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass, asdict
 from pathlib import Path
 
-from .config import ROOT, relative_to_root
+from config import MAX_CHUNK_CHARS, ROOT
 
 
-HEADING_RE = re.compile(r"^(#{1,3})\s+(.+?)\s*$")
-SLUG_RE = re.compile(r"[^a-z0-9]+")
+HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
 
 
-def heading_slug(heading: str) -> str:
-    """Return a stable slug for a Markdown heading."""
-    normalized = heading.strip().lower()
-    normalized = SLUG_RE.sub("-", normalized)
-    return normalized.strip("-") or "document"
+@dataclass(frozen=True)
+class MarkdownChunk:
+    chunk_id: str
+    file: str
+    heading: str
+    start_line: int
+    end_line: int
+    text: str
 
 
-def chunk_id(file_path: str, heading: str, seen: dict[str, int]) -> str:
-    """Return a stable chunk id based on file and heading."""
-    base_id = f"{file_path}#{heading_slug(heading)}"
-    seen[base_id] = seen.get(base_id, 0) + 1
-    if seen[base_id] == 1:
-        return base_id
-    return f"{base_id}-{seen[base_id]}"
+def slugify(value: str) -> str:
+    """Create a stable slug for chunk identifiers."""
+    value = value.lower().strip()
+    value = re.sub(r"[^a-z0-9áéíóúñü]+", "-", value)
+    return value.strip("-") or "root"
 
 
-def chunk_markdown_file(path: Path, root: Path = ROOT) -> list[dict[str, object]]:
-    """Split one Markdown file into heading-based chunks."""
-    relative_file = relative_to_root(path).as_posix()
-    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-    headings: list[tuple[int, str]] = []
+def split_large_text(text: str, max_chars: int = MAX_CHUNK_CHARS) -> list[str]:
+    """Split oversized text while preserving readability."""
+    if len(text) <= max_chars:
+        return [text]
 
-    for line_number, line in enumerate(lines, start=1):
+    parts: list[str] = []
+    current: list[str] = []
+    current_len = 0
+
+    for paragraph in text.split("\n\n"):
+        paragraph_len = len(paragraph)
+
+        if current and current_len + paragraph_len > max_chars:
+            parts.append("\n\n".join(current).strip())
+            current = []
+            current_len = 0
+
+        current.append(paragraph)
+        current_len += paragraph_len + 2
+
+    if current:
+        parts.append("\n\n".join(current).strip())
+
+    return [part for part in parts if part]
+
+
+def chunk_markdown(path: Path, text: str) -> list[MarkdownChunk]:
+    """Split a Markdown file into heading-based chunks."""
+    relative_file = path.relative_to(ROOT).as_posix()
+    lines = text.splitlines()
+
+    sections: list[tuple[str, int, int]] = []
+    current_heading = "ROOT"
+    current_start = 1
+
+    for idx, line in enumerate(lines, start=1):
         match = HEADING_RE.match(line)
-        if match:
-            headings.append((line_number, match.group(2).strip()))
-
-    if not headings:
-        headings = [(1, Path(relative_file).stem)]
-
-    chunks: list[dict[str, object]] = []
-    seen_ids: dict[str, int] = {}
-
-    for index, (start_line, heading) in enumerate(headings):
-        next_start = headings[index + 1][0] if index + 1 < len(headings) else len(lines) + 1
-        end_line = max(start_line, next_start - 1)
-        text = "\n".join(lines[start_line - 1:end_line]).strip()
-        if not text:
+        if not match:
             continue
-        chunks.append(
-            {
-                "chunk_id": chunk_id(relative_file, heading, seen_ids),
-                "file": relative_file,
-                "heading": heading,
-                "start_line": start_line,
-                "end_line": end_line,
-                "text": text,
-            }
-        )
+
+        if idx > current_start:
+            sections.append((current_heading, current_start, idx - 1))
+
+        current_heading = match.group(2).strip()
+        current_start = idx
+
+    if lines:
+        sections.append((current_heading, current_start, len(lines)))
+
+    chunks: list[MarkdownChunk] = []
+
+    for heading, start, end in sections:
+        section_text = "\n".join(lines[start - 1:end]).strip()
+        if not section_text:
+            continue
+
+        parts = split_large_text(section_text)
+        for part_index, part in enumerate(parts, start=1):
+            suffix = f"-{part_index}" if len(parts) > 1 else ""
+            chunk_id = f"{relative_file}#{slugify(heading)}{suffix}"
+
+            chunks.append(
+                MarkdownChunk(
+                    chunk_id=chunk_id,
+                    file=relative_file,
+                    heading=heading,
+                    start_line=start,
+                    end_line=end,
+                    text=part,
+                )
+            )
 
     return chunks
+
+
+def chunk_to_dict(chunk: MarkdownChunk) -> dict[str, object]:
+    """Serialize a MarkdownChunk to JSON-compatible dict."""
+    return asdict(chunk)

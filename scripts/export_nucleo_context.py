@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Export stable NUCLEO documentation for external LLM observation.
 
-This script is intentionally outside app/. It reads documentation only and
-writes static snapshots for local model review. It must not import or call
-AgentService, Runtime, Planner, PolicyEngine, ToolRegistry, or Tools.
+This script creates read-only snapshots of selected Markdown documentation.
+It does not audit source code, validate contracts, or compare documentation
+against Python implementation.
+
+For code/documentation consistency checks, use:
+AUTOMATION/SCRIPTS/audit_docs_contracts.py
 """
 
 from __future__ import annotations

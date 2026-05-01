@@ -1,35 +1,44 @@
-"""Discover Markdown documentation files for lexical retrieval."""
+"""Discover live Markdown files for NUCLEO documentation retrieval.
+
+This script only reads Markdown files. It does not copy source documents and
+does not import runtime components.
+"""
 
 from __future__ import annotations
 
-import os
-import sys
 from pathlib import Path
 
-sys.dont_write_bytecode = True
-
-from .config import EXCLUDED_PARTS, ROOT, is_included_markdown, relative_to_root
+from config import INCLUDED_SUFFIXES, ROOT, is_excluded
 
 
 def discover_markdown_files(root: Path = ROOT) -> list[Path]:
-    """Return allowed Markdown files under root in deterministic order."""
+    """Return Markdown files eligible for indexing."""
     files: list[Path] = []
-    for current_root, dirnames, filenames in os.walk(root):
-        current_path = Path(current_root)
-        dirnames[:] = sorted(
-            dirname for dirname in dirnames if dirname not in EXCLUDED_PARTS
-        )
-        for filename in sorted(filenames):
-            path = current_path / filename
-            if is_included_markdown(path):
-                files.append(path)
-    return sorted(files, key=lambda path: relative_to_root(path).as_posix())
+
+    for path in root.rglob("*"):
+        if not path.is_file():
+            continue
+
+        if path.suffix.lower() not in INCLUDED_SUFFIXES:
+            continue
+
+        if is_excluded(path):
+            continue
+
+        files.append(path)
+
+    return sorted(files)
+
+
+def read_markdown(path: Path) -> str:
+    """Read Markdown as UTF-8 text with replacement for invalid bytes."""
+    return path.read_text(encoding="utf-8", errors="replace")
 
 
 def main() -> None:
-    """Print discovered Markdown paths, one per line."""
-    for path in discover_markdown_files():
-        print(relative_to_root(path).as_posix())
+    files = discover_markdown_files()
+    for path in files:
+        print(path.relative_to(ROOT).as_posix())
 
 
 if __name__ == "__main__":
