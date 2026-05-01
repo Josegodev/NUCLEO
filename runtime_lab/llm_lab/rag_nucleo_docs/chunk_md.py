@@ -9,7 +9,10 @@ import re
 from dataclasses import dataclass, asdict
 from pathlib import Path
 
-from config import MAX_CHUNK_CHARS, ROOT
+try:
+    from .config import MAX_CHUNK_CHARS, ROOT
+except ImportError:  # pragma: no cover - keeps direct script execution working.
+    from config import MAX_CHUNK_CHARS, ROOT
 
 
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")

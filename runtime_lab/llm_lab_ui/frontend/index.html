@@ -1,22 +1,24 @@
 <!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Productive Agent Console v0</title>
+    <title>NUCLEO Augmented Controlled</title>
     <style>
       :root {
         color-scheme: light;
-        --bg: #f5f6f4;
+        --bg: #f4f6f8;
         --panel: #ffffff;
-        --text: #1d2329;
-        --muted: #66707a;
-        --line: #d7ddd8;
-        --accent: #145c55;
-        --accent-strong: #0d403b;
+        --panel-alt: #f8fafb;
+        --text: #1d252d;
+        --muted: #607080;
+        --line: #d7dee5;
+        --accent: #12635a;
+        --accent-strong: #0b473f;
         --danger: #a33a2f;
         --ok: #236b3f;
-        --code: #f0f2ee;
+        --warn: #8a5a00;
+        --code: #eef2f3;
       }
 
       * {
@@ -33,7 +35,7 @@
 
       header {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
         justify-content: space-between;
         gap: 16px;
         border-bottom: 1px solid var(--line);
@@ -42,28 +44,34 @@
       }
 
       h1,
-      h2 {
+      h2,
+      h3 {
         margin: 0;
         line-height: 1.2;
       }
 
       h1 {
-        font-size: 18px;
+        font-size: 19px;
       }
 
       h2 {
-        font-size: 15px;
+        font-size: 16px;
+      }
+
+      h3 {
+        font-size: 14px;
       }
 
       main {
         display: grid;
-        grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+        grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
         gap: 14px;
         padding: 14px;
       }
 
       aside,
-      section {
+      section,
+      .panel {
         border: 1px solid var(--line);
         border-radius: 8px;
         background: var(--panel);
@@ -75,9 +83,45 @@
         gap: 14px;
       }
 
-      .grid {
+      .tabs {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .tab-button {
+        min-height: 38px;
+        margin: 0;
+        border: 1px solid var(--line);
+        background: var(--panel-alt);
+        color: var(--text);
+      }
+
+      .tab-button.active {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: #fff;
+      }
+
+      .tab-panel.hidden {
+        display: none;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .compare-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 10px;
       }
 
@@ -107,13 +151,13 @@
       }
 
       textarea {
-        min-height: 150px;
+        min-height: 126px;
         resize: vertical;
       }
 
       button {
         width: 100%;
-        min-height: 38px;
+        min-height: 40px;
         margin-top: 12px;
         border: 0;
         border-radius: 6px;
@@ -132,41 +176,13 @@
         opacity: 0.6;
       }
 
-      .approval-actions {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .approval-actions button {
-        width: auto;
-        min-width: 92px;
-        margin-top: 0;
-        padding: 8px 12px;
-      }
-
-      .approval-actions button.secondary {
-        border: 1px solid var(--line);
-        background: #fff;
-        color: var(--text);
-      }
-
-      .approval-actions.hidden {
-        display: none;
-      }
-
-      .row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-      }
-
       .toggle-row {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 10px;
         min-height: 38px;
+        margin-top: 12px;
         border: 1px solid var(--line);
         border-radius: 6px;
         padding: 8px 10px;
@@ -184,7 +200,7 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 12px;
+        gap: 10px;
         margin-bottom: 10px;
       }
 
@@ -198,6 +214,7 @@
         color: var(--muted);
         font-size: 12px;
         font-weight: 700;
+        white-space: nowrap;
       }
 
       .pill.success {
@@ -209,6 +226,10 @@
         color: var(--danger);
       }
 
+      .pill.warn {
+        color: var(--warn);
+      }
+
       .muted {
         color: var(--muted);
         font-size: 13px;
@@ -217,21 +238,29 @@
       .metric {
         border: 1px solid var(--line);
         border-radius: 8px;
+        background: var(--panel-alt);
         padding: 10px;
       }
 
       .metric .value {
         margin-top: 4px;
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 750;
-        word-break: break-word;
+        overflow-wrap: anywhere;
+      }
+
+      .output-grid {
+        display: grid;
+        gap: 10px;
       }
 
       pre {
-        min-height: 80px;
+        min-height: 74px;
+        max-height: 360px;
         margin: 0;
+        overflow: auto;
         white-space: pre-wrap;
-        word-break: break-word;
+        overflow-wrap: anywhere;
         border: 1px solid var(--line);
         border-radius: 6px;
         background: var(--code);
@@ -240,16 +269,39 @@
         font-size: 12px;
       }
 
-      @media (max-width: 900px) {
+      pre.error-box {
+        border-color: var(--danger);
+        background: #fff1ef;
+      }
+
+      .contract-note {
+        margin-top: 10px;
+        border-left: 3px solid var(--warn);
+        background: #fff8e8;
+        padding: 8px 10px;
+      }
+
+      @media (max-width: 1040px) {
         main,
-        .row,
-        .grid {
+        .compare-grid {
           grid-template-columns: 1fr;
         }
 
-        header {
-          align-items: flex-start;
-          flex-direction: column;
+        .summary-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 620px) {
+        header,
+        main {
+          padding: 10px;
+        }
+
+        .row,
+        .summary-grid,
+        .tabs {
+          grid-template-columns: 1fr;
         }
       }
     </style>
@@ -257,103 +309,579 @@
   <body>
     <header>
       <div>
-        <h1>Productive Agent Console v0</h1>
-        <div class="muted">POST /agent/run</div>
+        <h1>NUCLEO Augmented Controlled</h1>
+        <div class="muted">HARDENING / LLM_LAB / COMPARE</div>
       </div>
-      <span id="status-pill" class="pill">idle</span>
+      <span id="global-state" class="pill">idle</span>
     </header>
 
     <main>
-      <aside>
-        <form id="agent-form">
-          <label for="api-base">Runtime URL</label>
-          <input id="api-base" value="http://127.0.0.1:8000" autocomplete="off" />
+      <aside class="stack">
+        <section>
+          <h2>Configuracion global</h2>
 
-          <label for="api-key">API key</label>
-          <input id="api-key" value="dev-jose-key" autocomplete="off" />
+          <label for="nucleo-base-url">NUCLEO base URL</label>
+          <input id="nucleo-base-url" value="http://127.0.0.1:8000" autocomplete="off" />
+
+          <label for="llm-lab-base-url">LLM_LAB base URL</label>
+          <input id="llm-lab-base-url" value="http://127.0.0.1:8765" autocomplete="off" />
+
+          <label for="nucleo-api-key">API key NUCLEO</label>
+          <input id="nucleo-api-key" value="dev-jose-key" autocomplete="off" />
 
           <div class="row">
             <div>
-              <label for="backend">Backend</label>
-              <select id="backend">
-                <option value="auto">auto</option>
-                <option value="local">local</option>
+              <label for="default-model">Modelo por defecto</label>
+              <select id="default-model">
+                <option value="llama3.1:8b">llama3.1:8b</option>
+                <option value="mistral">mistral</option>
+                <option value="qwen">qwen</option>
+              </select>
+            </div>
+            <div>
+              <label for="default-provider">Provider por defecto</label>
+              <select id="default-provider">
+                <option value="ollama">ollama</option>
                 <option value="openai">openai</option>
               </select>
             </div>
+          </div>
+        </section>
+
+        <section>
+          <h2>Modo</h2>
+          <div class="tabs" role="tablist" aria-label="Execution mode">
+            <button class="tab-button active" type="button" data-tab="hardening">HARDENING</button>
+            <button class="tab-button" type="button" data-tab="llm-lab">LLM_LAB</button>
+            <button class="tab-button" type="button" data-tab="compare">COMPARE</button>
+          </div>
+        </section>
+      </aside>
+
+      <div class="stack">
+        <section id="tab-hardening" class="tab-panel">
+          <div class="toolbar">
+            <h2>HARDENING</h2>
+            <span id="hardening-pill" class="pill">idle</span>
+          </div>
+
+          <label for="hardening-input">input</label>
+          <textarea id="hardening-input">system info</textarea>
+
+          <div class="toggle-row">
+            <label for="hardening-dry-run">dry_run</label>
+            <input id="hardening-dry-run" type="checkbox" checked />
+          </div>
+
+          <button id="hardening-run" type="button">Ejecutar HARDENING</button>
+
+          <div id="hardening-output" class="output-grid"></div>
+        </section>
+
+        <section id="tab-llm-lab" class="tab-panel hidden">
+          <div class="toolbar">
+            <h2>LLM_LAB</h2>
+            <span id="llm-lab-pill" class="pill">idle</span>
+          </div>
+
+          <label for="llm-query">query</label>
+          <textarea id="llm-query">Que hace dry_run=True?</textarea>
+
+          <div class="row">
             <div>
-              <label for="model-id">Model</label>
-              <select id="model-id">
+              <label for="llm-model">modelo</label>
+              <select id="llm-model">
                 <option value="llama3.1:8b">llama3.1:8b</option>
-                <option value="qwen">qwen</option>
                 <option value="mistral">mistral</option>
-                <option value="gpt-4o-mini">gpt-4o-mini</option>
+                <option value="qwen">qwen</option>
+              </select>
+            </div>
+            <div>
+              <label for="llm-provider">provider</label>
+              <select id="llm-provider">
+                <option value="ollama">ollama</option>
+                <option value="openai">openai</option>
               </select>
             </div>
           </div>
 
-          <label for="message">Message</label>
-          <textarea id="message" required>Show disk info for path=/</textarea>
-
-          <div class="row">
-            <div class="toggle-row">
-              <label for="proposal-only">proposal_only</label>
-              <input id="proposal-only" type="checkbox" checked disabled />
-            </div>
-            <div class="toggle-row">
-              <label for="dry-run">dry_run</label>
-              <input id="dry-run" type="checkbox" checked disabled />
-            </div>
+          <div class="toggle-row">
+            <label for="llm-use-rag">use_rag</label>
+            <input id="llm-use-rag" type="checkbox" checked disabled />
           </div>
 
-          <button id="run-button" type="submit">Run</button>
-        </form>
-        <p id="message-line" class="muted"></p>
-      </aside>
+          <div class="contract-note muted">
+            Contrato real detectado: POST /rag/model-answer acepta query, top_k y model. provider no es campo del backend; use_rag queda fijo porque este endpoint es RAG.
+          </div>
 
-      <div class="stack">
-        <section>
+          <button id="llm-run" type="button">Ejecutar LLM_LAB</button>
+
+          <div id="llm-output" class="output-grid"></div>
+        </section>
+
+        <section id="tab-compare" class="tab-panel hidden">
           <div class="toolbar">
-            <h2>Response</h2>
-            <div class="approval-actions hidden" id="approval-actions">
-              <button id="approve-button" type="button">Approve</button>
-              <button id="reject-button" type="button" class="secondary">Reject</button>
-            </div>
-            <span id="response-status" class="pill">pending</span>
+            <h2>COMPARE</h2>
+            <span id="compare-pill" class="pill">idle</span>
           </div>
-          <pre id="response-output"></pre>
-        </section>
 
-        <section>
-          <h2>Proposal</h2>
-          <pre id="proposal-output"></pre>
-        </section>
+          <label for="compare-input">input unico</label>
+          <textarea id="compare-input">Que hace dry_run=True?</textarea>
 
-        <section>
-          <h2>Runtime Metadata</h2>
-          <div class="grid">
-            <div class="metric">
-              <div class="muted">backend_used</div>
-              <div id="backend-used" class="value">-</div>
+          <button id="compare-run" type="button">Ejecutar en paralelo</button>
+
+          <div class="compare-grid">
+            <div class="panel">
+              <div class="toolbar">
+                <h3>HARDENING</h3>
+                <span id="compare-hardening-pill" class="pill">idle</span>
+              </div>
+              <div id="compare-hardening-output" class="output-grid"></div>
             </div>
-            <div class="metric">
-              <div class="muted">model_used</div>
-              <div id="model-used" class="value">-</div>
-            </div>
-            <div class="metric">
-              <div class="muted">latency_ms</div>
-              <div id="latency-ms" class="value">-</div>
+            <div class="panel">
+              <div class="toolbar">
+                <h3>LLM_LAB</h3>
+                <span id="compare-llm-pill" class="pill">idle</span>
+              </div>
+              <div id="compare-llm-output" class="output-grid"></div>
             </div>
           </div>
-        </section>
-
-        <section>
-          <h2>Raw Result</h2>
-          <pre id="raw-output"></pre>
         </section>
       </div>
     </main>
 
-    <script src="./agent_console.js"></script>
+    <script>
+      const storagePrefix = 'nucleo_augmented_controlled.';
+
+      const nodes = {
+        globalState: document.getElementById('global-state'),
+        nucleoBaseUrl: document.getElementById('nucleo-base-url'),
+        llmLabBaseUrl: document.getElementById('llm-lab-base-url'),
+        nucleoApiKey: document.getElementById('nucleo-api-key'),
+        defaultModel: document.getElementById('default-model'),
+        defaultProvider: document.getElementById('default-provider'),
+        tabButtons: Array.from(document.querySelectorAll('.tab-button')),
+        panels: {
+          hardening: document.getElementById('tab-hardening'),
+          'llm-lab': document.getElementById('tab-llm-lab'),
+          compare: document.getElementById('tab-compare'),
+        },
+        hardening: {
+          input: document.getElementById('hardening-input'),
+          dryRun: document.getElementById('hardening-dry-run'),
+          run: document.getElementById('hardening-run'),
+          pill: document.getElementById('hardening-pill'),
+          output: document.getElementById('hardening-output'),
+        },
+        llm: {
+          query: document.getElementById('llm-query'),
+          model: document.getElementById('llm-model'),
+          provider: document.getElementById('llm-provider'),
+          useRag: document.getElementById('llm-use-rag'),
+          run: document.getElementById('llm-run'),
+          pill: document.getElementById('llm-lab-pill'),
+          output: document.getElementById('llm-output'),
+        },
+        compare: {
+          input: document.getElementById('compare-input'),
+          run: document.getElementById('compare-run'),
+          pill: document.getElementById('compare-pill'),
+          hardeningPill: document.getElementById('compare-hardening-pill'),
+          llmPill: document.getElementById('compare-llm-pill'),
+          hardeningOutput: document.getElementById('compare-hardening-output'),
+          llmOutput: document.getElementById('compare-llm-output'),
+        },
+      };
+
+      function normalizeBaseUrl(value) {
+        return value.trim().replace(/\/+$/, '');
+      }
+
+      function pretty(value) {
+        return JSON.stringify(value ?? null, null, 2);
+      }
+
+      function localTimestamp(date = new Date()) {
+        const pad = (value) => String(value).padStart(2, '0');
+        const offsetMinutes = -date.getTimezoneOffset();
+        const sign = offsetMinutes >= 0 ? '+' : '-';
+        const offsetHours = pad(Math.floor(Math.abs(offsetMinutes) / 60));
+        const offsetRemainder = pad(Math.abs(offsetMinutes) % 60);
+        return [
+          date.getFullYear(),
+          '-',
+          pad(date.getMonth() + 1),
+          '-',
+          pad(date.getDate()),
+          'T',
+          pad(date.getHours()),
+          ':',
+          pad(date.getMinutes()),
+          ':',
+          pad(date.getSeconds()),
+          sign,
+          offsetHours,
+          ':',
+          offsetRemainder,
+        ].join('');
+      }
+
+      function setPill(element, text, state = '') {
+        element.className = `pill ${state}`.trim();
+        element.textContent = text;
+      }
+
+      function stateFromEnvelope(envelope) {
+        if (!envelope.ok) return 'error';
+        const status = envelope.response && typeof envelope.response === 'object'
+          ? envelope.response.status
+          : null;
+        if (status === 'success' || status === 'MODEL_ANSWER_READY') return 'success';
+        if (status === 'rejected' || status === 'EVIDENCE_NOT_FOUND') return 'warn';
+        return 'success';
+      }
+
+      function persistConfig() {
+        const values = {
+          nucleoBaseUrl: nodes.nucleoBaseUrl.value,
+          llmLabBaseUrl: nodes.llmLabBaseUrl.value,
+          nucleoApiKey: nodes.nucleoApiKey.value,
+          defaultModel: nodes.defaultModel.value,
+          defaultProvider: nodes.defaultProvider.value,
+        };
+        for (const [key, value] of Object.entries(values)) {
+          localStorage.setItem(`${storagePrefix}${key}`, value);
+        }
+      }
+
+      function restoreConfig() {
+        const currentOrigin = window.location.origin.startsWith('http')
+          ? window.location.origin
+          : 'http://127.0.0.1:8765';
+        nodes.llmLabBaseUrl.value = currentOrigin;
+
+        for (const key of ['nucleoBaseUrl', 'llmLabBaseUrl', 'nucleoApiKey', 'defaultModel', 'defaultProvider']) {
+          const stored = localStorage.getItem(`${storagePrefix}${key}`);
+          if (stored && nodes[key]) nodes[key].value = stored;
+        }
+
+        nodes.llm.model.value = nodes.defaultModel.value;
+        nodes.llm.provider.value = nodes.defaultProvider.value;
+      }
+
+      function buildRequestHardening(input, dryRun) {
+        return {
+          method: 'POST',
+          path: '/agent/run',
+          payload: {
+            input,
+            dry_run: Boolean(dryRun),
+          },
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        };
+      }
+
+      function buildRequestLLMLab(query, model, provider, useRag) {
+        const selectedProvider = provider === 'openai' ? 'openai' : 'ollama';
+        const payloadModel = selectedProvider === 'openai' ? 'external/openai' : model;
+
+        return {
+          method: 'POST',
+          path: '/rag/model-answer',
+          payload: {
+            query,
+            top_k: 5,
+            model: payloadModel,
+          },
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          ui_context: {
+            provider: selectedProvider,
+            use_rag: Boolean(useRag),
+            contract_note: 'provider and use_rag are UI controls; the current backend contract only accepts query, top_k and model.',
+          },
+        };
+      }
+
+      async function readBody(response) {
+        const raw = await response.text();
+        if (!raw) {
+          return { raw, parsed: null, parse_error: null };
+        }
+
+        try {
+          return { raw, parsed: JSON.parse(raw), parse_error: null };
+        } catch (error) {
+          return {
+            raw,
+            parsed: raw,
+            parse_error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      }
+
+      async function callAPI(baseUrl, request, options = {}) {
+        const endpoint = `${normalizeBaseUrl(baseUrl)}${request.path}`;
+        const timestampLocal = localTimestamp();
+        const headers = { ...(request.headers || {}) };
+        const apiKey = options.apiKey ? options.apiKey.trim() : '';
+        if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+
+        try {
+          const response = await fetch(endpoint, {
+            method: request.method,
+            headers,
+            body: JSON.stringify(request.payload),
+          });
+          const body = await readBody(response);
+
+          return {
+            ok: response.ok,
+            method: request.method,
+            endpoint,
+            path: request.path,
+            timestamp_local: timestampLocal,
+            completed_at_local: localTimestamp(),
+            http_status: response.status,
+            http_status_text: response.statusText,
+            payload_sent: request.payload,
+            response: body.parsed,
+            response_raw: body.raw,
+            parse_error: body.parse_error,
+            ui_context: request.ui_context || null,
+          };
+        } catch (error) {
+          return {
+            ok: false,
+            method: request.method,
+            endpoint,
+            path: request.path,
+            timestamp_local: timestampLocal,
+            completed_at_local: localTimestamp(),
+            http_status: null,
+            http_status_text: null,
+            payload_sent: request.payload,
+            response: null,
+            response_raw: '',
+            parse_error: null,
+            error_type: 'network_error',
+            message: error instanceof Error ? error.message : String(error),
+            ui_context: request.ui_context || null,
+          };
+        }
+      }
+
+      function findField(value, fieldName) {
+        if (!value || typeof value !== 'object') return null;
+        if (typeof value[fieldName] === 'string') return value[fieldName];
+        for (const child of Object.values(value)) {
+          if (child && typeof child === 'object') {
+            const found = findField(child, fieldName);
+            if (found) return found;
+          }
+        }
+        return null;
+      }
+
+      function appendMetricGrid(container, items) {
+        const grid = document.createElement('div');
+        grid.className = 'summary-grid';
+        for (const item of items) {
+          const metric = document.createElement('div');
+          metric.className = 'metric';
+          const label = document.createElement('div');
+          label.className = 'muted';
+          label.textContent = item.label;
+          const value = document.createElement('div');
+          value.className = 'value';
+          value.textContent = item.value ?? '-';
+          metric.append(label, value);
+          grid.appendChild(metric);
+        }
+        container.appendChild(grid);
+      }
+
+      function appendPre(container, title, value, error = false) {
+        const group = document.createElement('div');
+        const heading = document.createElement('h3');
+        heading.textContent = title;
+        const pre = document.createElement('pre');
+        pre.textContent = typeof value === 'string' ? value : pretty(value);
+        pre.classList.toggle('error-box', error);
+        group.append(heading, pre);
+        container.appendChild(group);
+      }
+
+      function renderResponse(container, envelope, mode) {
+        container.textContent = '';
+        const response = envelope.response && typeof envelope.response === 'object' ? envelope.response : {};
+        const result = response.result ?? null;
+        const errors = response.errors ?? null;
+        const traceId = findField(response, 'trace_id');
+        const requestId = findField(response, 'request_id');
+
+        appendMetricGrid(container, [
+          { label: 'method', value: envelope.method },
+          { label: 'endpoint', value: envelope.endpoint },
+          { label: 'timestamp local', value: envelope.timestamp_local },
+          { label: 'HTTP status', value: envelope.http_status === null ? 'network_error' : `${envelope.http_status} ${envelope.http_status_text}` },
+        ]);
+
+        if (mode === 'hardening') {
+          appendMetricGrid(container, [
+            { label: 'status', value: response.status },
+            { label: 'trace_id', value: traceId },
+            { label: 'request_id', value: requestId },
+            { label: 'version', value: response.version },
+          ]);
+          appendPre(container, 'payload enviado', envelope.payload_sent);
+          appendPre(container, 'result', result);
+          appendPre(container, 'errors', errors);
+          appendPre(container, 'response completa', response);
+        } else if (mode === 'llm') {
+          appendMetricGrid(container, [
+            { label: 'status', value: response.status },
+            { label: 'model', value: response.model },
+            { label: 'fallback_used', value: response.fallback_used },
+            { label: 'fallback_reason', value: response.fallback_reason },
+          ]);
+          appendPre(container, 'payload enviado', envelope.payload_sent);
+          appendPre(container, 'answer', response.answer ?? null);
+          appendPre(container, 'evidence', response.evidence ?? null);
+          appendPre(container, 'ui_context', envelope.ui_context);
+          appendPre(container, 'response completa', response);
+        }
+
+        appendPre(container, 'response raw', envelope.response_raw, !envelope.ok);
+        if (envelope.error_type || envelope.parse_error) {
+          appendPre(container, 'transport error', {
+            error_type: envelope.error_type || null,
+            message: envelope.message || null,
+            parse_error: envelope.parse_error || null,
+          }, true);
+        }
+      }
+
+      function renderError(container, envelope, mode) {
+        renderResponse(container, envelope, mode);
+      }
+
+      function setActiveTab(tabName) {
+        for (const button of nodes.tabButtons) {
+          button.classList.toggle('active', button.dataset.tab === tabName);
+        }
+        for (const [name, panel] of Object.entries(nodes.panels)) {
+          panel.classList.toggle('hidden', name !== tabName);
+        }
+      }
+
+      async function runHardening() {
+        persistConfig();
+        nodes.hardening.run.disabled = true;
+        setPill(nodes.globalState, 'running');
+        setPill(nodes.hardening.pill, 'running');
+
+        const request = buildRequestHardening(
+          nodes.hardening.input.value,
+          nodes.hardening.dryRun.checked,
+        );
+        const envelope = await callAPI(nodes.nucleoBaseUrl.value, request, {
+          apiKey: nodes.nucleoApiKey.value,
+        });
+
+        const state = stateFromEnvelope(envelope);
+        setPill(nodes.hardening.pill, envelope.ok ? 'done' : 'error', state);
+        setPill(nodes.globalState, envelope.ok ? 'idle' : 'error', envelope.ok ? '' : 'error');
+        (envelope.ok ? renderResponse : renderError)(nodes.hardening.output, envelope, 'hardening');
+        nodes.hardening.run.disabled = false;
+      }
+
+      async function runLLMLab() {
+        persistConfig();
+        nodes.llm.run.disabled = true;
+        setPill(nodes.globalState, 'running');
+        setPill(nodes.llm.pill, 'running');
+
+        const request = buildRequestLLMLab(
+          nodes.llm.query.value,
+          nodes.llm.model.value,
+          nodes.llm.provider.value,
+          nodes.llm.useRag.checked,
+        );
+        const envelope = await callAPI(nodes.llmLabBaseUrl.value, request);
+
+        const state = stateFromEnvelope(envelope);
+        setPill(nodes.llm.pill, envelope.ok ? 'done' : 'error', state);
+        setPill(nodes.globalState, envelope.ok ? 'idle' : 'error', envelope.ok ? '' : 'error');
+        (envelope.ok ? renderResponse : renderError)(nodes.llm.output, envelope, 'llm');
+        nodes.llm.run.disabled = false;
+      }
+
+      async function runCompare() {
+        persistConfig();
+        nodes.compare.run.disabled = true;
+        setPill(nodes.globalState, 'running');
+        setPill(nodes.compare.pill, 'running');
+        setPill(nodes.compare.hardeningPill, 'running');
+        setPill(nodes.compare.llmPill, 'running');
+
+        const hardeningRequest = buildRequestHardening(nodes.compare.input.value, true);
+        const llmRequest = buildRequestLLMLab(
+          nodes.compare.input.value,
+          nodes.defaultModel.value,
+          nodes.defaultProvider.value,
+          true,
+        );
+
+        const [hardeningEnvelope, llmEnvelope] = await Promise.all([
+          callAPI(nodes.nucleoBaseUrl.value, hardeningRequest, { apiKey: nodes.nucleoApiKey.value }),
+          callAPI(nodes.llmLabBaseUrl.value, llmRequest),
+        ]);
+
+        const hardeningState = stateFromEnvelope(hardeningEnvelope);
+        const llmState = stateFromEnvelope(llmEnvelope);
+        setPill(nodes.compare.hardeningPill, hardeningEnvelope.ok ? 'done' : 'error', hardeningState);
+        setPill(nodes.compare.llmPill, llmEnvelope.ok ? 'done' : 'error', llmState);
+        setPill(
+          nodes.compare.pill,
+          hardeningEnvelope.ok && llmEnvelope.ok ? 'done' : 'partial',
+          hardeningEnvelope.ok && llmEnvelope.ok ? 'success' : 'warn',
+        );
+        setPill(nodes.globalState, 'idle');
+
+        (hardeningEnvelope.ok ? renderResponse : renderError)(nodes.compare.hardeningOutput, hardeningEnvelope, 'hardening');
+        (llmEnvelope.ok ? renderResponse : renderError)(nodes.compare.llmOutput, llmEnvelope, 'llm');
+        nodes.compare.run.disabled = false;
+      }
+
+      nodes.tabButtons.forEach((button) => {
+        button.addEventListener('click', () => setActiveTab(button.dataset.tab));
+      });
+
+      for (const field of [
+        nodes.nucleoBaseUrl,
+        nodes.llmLabBaseUrl,
+        nodes.nucleoApiKey,
+        nodes.defaultModel,
+        nodes.defaultProvider,
+      ]) {
+        field.addEventListener('change', persistConfig);
+      }
+
+      nodes.defaultModel.addEventListener('change', () => {
+        nodes.llm.model.value = nodes.defaultModel.value;
+      });
+      nodes.defaultProvider.addEventListener('change', () => {
+        nodes.llm.provider.value = nodes.defaultProvider.value;
+      });
+      nodes.hardening.run.addEventListener('click', runHardening);
+      nodes.llm.run.addEventListener('click', runLLMLab);
+      nodes.compare.run.addEventListener('click', runCompare);
+
+      restoreConfig();
+    </script>
   </body>
 </html>

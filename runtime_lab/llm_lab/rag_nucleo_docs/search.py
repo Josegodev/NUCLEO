@@ -1,13 +1,7 @@
-def search(query: str, top_k: int = 5):
-    """
-    ÚNICO punto de entrada del RAG.
-    Determinista.
-    """
-    ...
+"""Query the local NUCLEO Markdown lexical index.
 
- """Query the local NUCLEO Markdown lexical index.
-
-This is retrieval only. It does not call an LLM and does not execute NUCLEO tools.
+This is retrieval only. It does not call an LLM and does not execute NUCLEO
+tools.
 """
 
 from __future__ import annotations
@@ -17,7 +11,10 @@ import json
 import re
 from pathlib import Path
 
-from config import DEFAULT_TOP_K, INDEX_FILE
+try:
+    from .config import DEFAULT_TOP_K, INDEX_FILE
+except ImportError:  # pragma: no cover - keeps direct script execution working.
+    from config import DEFAULT_TOP_K, INDEX_FILE
 
 
 TOKEN_RE = re.compile(r"[a-zA-Z0-9_áéíóúÁÉÍÓÚñÑüÜ]+")
@@ -48,7 +45,7 @@ def score_chunk(query_tokens: set[str], chunk: dict[str, object]) -> float:
     return len(overlap) / len(query_tokens)
 
 
-def query(question: str, top_k: int = DEFAULT_TOP_K) -> dict[str, object]:
+def search(question: str, top_k: int = DEFAULT_TOP_K) -> dict[str, object]:
     """Return top matching chunks for a question."""
     index = load_index()
     query_tokens = tokenize(question)
@@ -62,19 +59,28 @@ def query(question: str, top_k: int = DEFAULT_TOP_K) -> dict[str, object]:
         if score <= 0:
             continue
 
+        doc_id = chunk["chunk_id"]
         scored.append(
             {
                 "score": round(score, 4),
-                "chunk_id": chunk["chunk_id"],
+                "doc_id": doc_id,
+                "chunk_id": doc_id,
                 "file": chunk["file"],
                 "heading": chunk["heading"],
                 "start_line": chunk["start_line"],
                 "end_line": chunk["end_line"],
-                "text": chunk["text"],
+                "snippet": chunk["text"],
             }
         )
 
-    scored.sort(key=lambda item: item["score"], reverse=True)
+    scored.sort(
+        key=lambda item: (
+            -float(item["score"]),
+            str(item.get("file", "")),
+            int(item.get("start_line", 0)),
+            str(item.get("doc_id", "")),
+        )
+    )
 
     if not scored:
         return {
@@ -99,9 +105,9 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    result = query(args.question, top_k=args.top_k)
+    result = search(args.question, top_k=args.top_k)
     print(json.dumps(result, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":
-    main()   
+    main()

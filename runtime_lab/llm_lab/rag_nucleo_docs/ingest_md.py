@@ -8,7 +8,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from config import INCLUDED_SUFFIXES, ROOT, is_excluded
+try:
+    from .config import INCLUDED_SUFFIXES, ROOT, is_excluded
+except ImportError:  # pragma: no cover - keeps direct script execution working.
+    from config import INCLUDED_SUFFIXES, ROOT, is_excluded
 
 
 def discover_markdown_files(root: Path = ROOT) -> list[Path]:

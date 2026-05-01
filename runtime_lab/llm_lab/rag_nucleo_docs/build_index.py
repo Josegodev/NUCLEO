@@ -10,9 +10,14 @@ import json
 import re
 from datetime import datetime, timezone
 
-from chunk_md import chunk_markdown, chunk_to_dict
-from config import INDEX_DIR, INDEX_FILE, ROOT
-from ingest_md import discover_markdown_files, read_markdown
+try:
+    from .chunk_md import chunk_markdown, chunk_to_dict
+    from .config import INDEX_DIR, INDEX_FILE, ROOT
+    from .ingest_md import discover_markdown_files, read_markdown
+except ImportError:  # pragma: no cover - keeps direct script execution working.
+    from chunk_md import chunk_markdown, chunk_to_dict
+    from config import INDEX_DIR, INDEX_FILE, ROOT
+    from ingest_md import discover_markdown_files, read_markdown
 
 
 TOKEN_RE = re.compile(r"[a-zA-Z0-9_áéíóúÁÉÍÓÚñÑüÜ]+")
@@ -21,6 +26,11 @@ TOKEN_RE = re.compile(r"[a-zA-Z0-9_áéíóúÁÉÍÓÚñÑüÜ]+")
 def tokenize(text: str) -> list[str]:
     """Normalize text into lexical tokens."""
     return [token.lower() for token in TOKEN_RE.findall(text)]
+
+
+def normalize_text(text: str) -> str:
+    """Return deterministic normalized text for retrieval checks."""
+    return " ".join(tokenize(text))
 
 
 def build_index() -> dict[str, object]:
