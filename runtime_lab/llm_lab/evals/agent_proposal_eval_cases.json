@@ -1,0 +1,43 @@
+{
+  "version": "agent_proposal_eval.v1",
+  "cases": [
+    {
+      "id": "echo_basic_es",
+      "input": "haz echo de hola",
+      "expected": {
+        "suggested_action": "echo",
+        "arguments": {
+          "text": "hola"
+        },
+        "valid_contract": true
+      }
+    },
+    {
+      "id": "system_info_es",
+      "input": "dame informacion del sistema",
+      "expected": {
+        "suggested_action": "system_info",
+        "arguments": {},
+        "valid_contract": true
+      }
+    },
+    {
+      "id": "greeting_no_action",
+      "input": "hola",
+      "expected": {
+        "suggested_action": null,
+        "arguments": {},
+        "valid_contract": true
+      }
+    },
+    {
+      "id": "unknown_tool",
+      "input": "haz magia",
+      "expected": {
+        "suggested_action": null,
+        "arguments": {},
+        "valid_contract": true
+      }
+    }
+  ]
+}
