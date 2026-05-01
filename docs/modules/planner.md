@@ -54,7 +54,64 @@ Statuses:
 - Matching logic is weak and heuristic-based
 - Strong coupling to literal production tool names remains
 
+## Planner Contract - HARDENING
+
+The planner contract is closed around one responsibility:
+
+```text
+AgentRequest -> PlannerStrategy -> PlannedAction
+```
+
+`PlannerStrategy` receives an `AgentRequest` and must return a valid
+`PlannedAction`. The public `Planner` wrapper checks this boundary before
+returning the plan to `AgentRuntime`.
+
+The only valid production execution order remains:
+
+```text
+Planner -> PolicyEngine -> ToolRegistry -> Tool
+```
+
+Allowed behavior:
+
+- `DeterministicPlannerStrategy` may inspect `AgentRequest` and produce a
+  deterministic `PlannedAction`.
+- `LLMAssistedPlannerStrategy` may build structured LLM input, receive raw LLM
+  output from an injected proposal provider, validate that output, and fall back
+  to deterministic planning when validation fails.
+- `LLMAssistedPlannerStrategy` may convert validated output to
+  `PlannedAction(source="llm_assisted")`.
+- LLM augmentation audit records may store raw output, validated output,
+  acceptance state, and fallback reason.
+
+Explicitly prohibited behavior:
+
+- `LLM -> Tool`
+- `LLM -> PolicyDecision`
+- `LLM -> ToolRegistry`
+- Planner strategies must not execute tools.
+- Planner strategies must not create or return `PolicyDecision`.
+- Planner strategies must not register tools.
+- Planner strategies must not bypass `PolicyEngine`.
+
+Validation requirements for LLM-assisted planning:
+
+- invalid JSON is rejected
+- unknown tools are rejected
+- tools missing from the active `ToolRegistry` are rejected
+- invalid payloads are rejected
+- incomplete outputs are rejected
+- rejected LLM output triggers deterministic fallback
+
+Authority remains outside the planner:
+
+- `PolicyDecisionValue = ALLOW | DENY`
+- `dry_run` is a runtime execution flag, not a `PolicyDecisionValue`
+- tools execute only after `PolicyEngine` returns `ALLOW`
+
 ## Status Label
 
 - Production planning: implemented
-- Real LLM-assisted planning: not implemented
+- Real LLM execution/integration: not implemented
+- LLM-assisted planning boundary: stubbed, validated, and disabled unless
+  explicitly injected
