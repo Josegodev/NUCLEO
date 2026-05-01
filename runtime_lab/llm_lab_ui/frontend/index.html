@@ -214,6 +214,16 @@
         border-left: 4px solid var(--error);
       }
 
+      .notice {
+        border: 1px solid var(--line);
+        border-left: 4px solid var(--warn);
+        border-radius: 6px;
+        background: #fff8e5;
+        color: var(--warn);
+        margin-top: 10px;
+        padding: 9px 10px;
+      }
+
       .hidden {
         display: none;
       }
@@ -269,6 +279,40 @@
       <div class="layout-stack">
         <section>
           <div class="toolbar">
+            <h2>RAG Docs</h2>
+            <span class="status partial_success">prepared</span>
+          </div>
+          <form id="rag-form">
+            <label for="rag-query">Document query</label>
+            <textarea id="rag-query" placeholder="Ask a question about NUCLEO documentation."></textarea>
+
+            <label for="rag-model">Model</label>
+            <select id="rag-model">
+              <option value="llama3.1:8b">llama3.1:8b</option>
+              <option value="mistral">mistral</option>
+              <option value="qwen">qwen</option>
+              <option value="external/openai">external/openai</option>
+              <option value="external/anthropic">external/anthropic</option>
+              <option value="external/custom">external/custom</option>
+            </select>
+
+            <div id="rag-external-warning" class="notice hidden">
+              External providers are not enabled in this HARDENING step.
+            </div>
+
+            <div id="rag-custom-model-wrap" class="hidden">
+              <label for="rag-custom-model">Custom external model</label>
+              <input id="rag-custom-model" placeholder="provider/model-name" />
+            </div>
+
+            <button id="rag-run-button" type="submit">Run RAG</button>
+          </form>
+          <p id="rag-message" class="subtle">Ready to query the lab-only RAG backend.</p>
+          <div id="rag-output"></div>
+        </section>
+
+        <section>
+          <div class="toolbar">
             <h2>Artifact Detail</h2>
             <span id="artifact-status"></span>
           </div>
@@ -317,6 +361,19 @@
           });
           if (!res.ok) throw new Error(await res.text());
           return res.json();
+        },
+        async answerRag(payload) {
+          const res = await fetch('/rag/answer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const text = await res.text();
+          const body = text ? JSON.parse(text) : {};
+          if (!res.ok) {
+            throw new Error(body.detail || text || 'INTERNAL_ERROR');
+          }
+          return body;
         },
       };
 
@@ -417,6 +474,25 @@
         `;
       }
 
+      function renderRagAnswer(result) {
+        const evidence = Array.isArray(result.evidence) ? result.evidence : [];
+        return `
+          <div>${statusPill(result.status || 'UNKNOWN')}</div>
+          <pre>${escapeHtml(result.answer || '')}</pre>
+          ${evidence.length ? `
+            <div class="grid">
+              ${evidence.map((item) => `
+                <div class="card">
+                  <h3>${escapeHtml(item.source || item.doc_id || 'source')}</h3>
+                  <div class="subtle">Score: ${escapeHtml(item.score ?? 'n/a')}</div>
+                  <pre>${escapeHtml(item.snippet || '')}</pre>
+                </div>
+              `).join('')}
+            </div>
+          ` : '<div class="subtle">No evidence returned.</div>'}
+        `;
+      }
+
       document.getElementById('run-form').addEventListener('submit', async (event) => {
         event.preventDefault();
         const button = document.getElementById('run-button');
@@ -441,6 +517,47 @@
       });
 
       document.getElementById('refresh').addEventListener('click', refreshArtifacts);
+
+      function updateRagModelState() {
+        const model = document.getElementById('rag-model').value;
+        const isExternal = model.startsWith('external/');
+        document.getElementById('rag-external-warning').classList.toggle('hidden', !isExternal);
+        document.getElementById('rag-custom-model-wrap').classList.toggle('hidden', model !== 'external/custom');
+      }
+
+      document.getElementById('rag-model').addEventListener('change', updateRagModelState);
+      document.getElementById('rag-form').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const model = document.getElementById('rag-model').value;
+        const message = document.getElementById('rag-message');
+        const output = document.getElementById('rag-output');
+        if (model.startsWith('external/')) {
+          message.textContent = 'External providers are not enabled in this HARDENING step.';
+          output.innerHTML = '';
+          return;
+        }
+
+        const button = document.getElementById('rag-run-button');
+        button.disabled = true;
+        message.textContent = 'Running RAG...';
+        output.innerHTML = '';
+        try {
+          const result = await api.answerRag({
+            query: document.getElementById('rag-query').value,
+            top_k: 5,
+            model,
+          });
+          message.textContent = 'RAG answer ready.';
+          output.innerHTML = renderRagAnswer(result);
+        } catch (error) {
+          message.textContent = `Error: ${error.message}`;
+          output.innerHTML = `<div class="card error-panel">${escapeHtml(error.message)}</div>`;
+        } finally {
+          button.disabled = false;
+        }
+      });
+      updateRagModelState();
+
       refreshArtifacts().catch((error) => {
         document.getElementById('artifact-list').innerHTML = `<div class="card error-panel">${escapeHtml(error.message)}</div>`;
       });

@@ -28,10 +28,14 @@ if str(LLM_LAB_DIR) not in sys.path:
 from experiment_runner import default_config, run_experiment  # noqa: E402
 from experiment_validator import ArtifactValidationError, validate_artifact  # noqa: E402
 from model_adapter import OLLAMA_MODEL_ALIASES  # noqa: E402
+from rag_nucleo_docs.rag_answer import build_answer  # noqa: E402
+from rag_nucleo_docs.search import search as rag_search  # noqa: E402
 
 
 ALLOWED_MODES = {"mock", "mock-success", "ollama"}
 ALLOWED_LOCAL_MODELS = set(OLLAMA_MODEL_ALIASES)
+ALLOWED_RAG_MODELS = {"llama3.1:8b", "mistral", "qwen"}
+EXTERNAL_RAG_MODELS = {"external/openai", "external/anthropic", "external/custom"}
 DEFAULT_LOCAL_MODELS = ["qwen", "mistral", "llama3.1:8b"]
 MOCK_SUCCESS_MODELS = ["mock/model-a", "mock/model-b", "mock/model-c"]
 MOCK_ERROR_STAGE1 = ["mock/model-a", "mock/model-unavailable", "mock/model-empty"]
@@ -84,6 +88,20 @@ class ExperimentRequest(BaseModel):
         if value not in ALLOWED_LOCAL_MODELS:
             allowed = ", ".join(sorted(ALLOWED_LOCAL_MODELS))
             raise ValueError(f"chairman must be one of: {allowed}")
+        return value
+
+
+class RagRequest(BaseModel):
+    query: str = Field(min_length=1)
+    top_k: int = Field(default=5, ge=1, le=20)
+    model: str | None = None
+
+    @field_validator("query")
+    @classmethod
+    def query_must_not_be_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("query must not be blank")
         return value
 
 
@@ -184,6 +202,36 @@ async def create_experiment(request: ExperimentRequest) -> dict[str, str]:
     }
 
 
+@app.post("/rag/search")
+async def search_rag(request: RagRequest) -> dict[str, object]:
+    try:
+        _validate_rag_model(request.model)
+        return rag_search(request.query, top_k=request.top_k)
+    except HTTPException:
+        raise
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail="RAG_INDEX_NOT_FOUND") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="INTERNAL_ERROR") from exc
+
+
+@app.post("/rag/answer")
+async def answer_rag(request: RagRequest) -> dict[str, object]:
+    try:
+        _validate_rag_model(request.model)
+        return build_answer(request.query, top_k=request.top_k)
+    except HTTPException:
+        raise
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail="RAG_INDEX_NOT_FOUND") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="INTERNAL_ERROR") from exc
+
+
 def _read_artifact_file(path: Path) -> dict[str, object]:
     try:
         resolved = path.resolve()
@@ -199,6 +247,16 @@ def _read_artifact_file(path: Path) -> dict[str, object]:
         raise HTTPException(status_code=500, detail=f"Invalid artifact JSON: {path.name}") from exc
     except ArtifactValidationError as exc:
         raise HTTPException(status_code=500, detail=f"Artifact contract violation: {path.name}: {exc}") from exc
+
+
+def _validate_rag_model(model: str | None) -> None:
+    if model is None:
+        return
+    if model in EXTERNAL_RAG_MODELS or model.startswith("external/"):
+        raise HTTPException(status_code=400, detail="EXTERNAL_MODEL_NOT_ENABLED")
+    if model not in ALLOWED_RAG_MODELS:
+        allowed = ", ".join(sorted(ALLOWED_RAG_MODELS))
+        raise ValueError(f"Unsupported RAG model: {model}. Allowed models: {allowed}")
 
 
 def _validate_experiment_id(experiment_id: str) -> None:
