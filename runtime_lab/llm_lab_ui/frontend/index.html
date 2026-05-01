@@ -224,6 +224,19 @@
         padding: 9px 10px;
       }
 
+      .inline-control {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 650;
+        margin: 12px 0 6px;
+      }
+
+      .inline-control input {
+        width: auto;
+      }
+
       .hidden {
         display: none;
       }
@@ -305,6 +318,15 @@
               <input id="rag-custom-model" placeholder="provider/model-name" />
             </div>
 
+            <label class="inline-control" for="rag-use-model">
+              <input id="rag-use-model" type="checkbox" />
+              <span>Ask selected local model using retrieved evidence</span>
+            </label>
+
+            <div id="rag-experimental-label" class="notice hidden">
+              Experimental &mdash; model output constrained by RAG evidence
+            </div>
+
             <button id="rag-run-button" type="submit">Run RAG</button>
           </form>
           <p id="rag-message" class="subtle">Ready to query the lab-only RAG backend.</p>
@@ -364,6 +386,19 @@
         },
         async answerRag(payload) {
           const res = await fetch('/rag/answer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          const text = await res.text();
+          const body = text ? JSON.parse(text) : {};
+          if (!res.ok) {
+            throw new Error(body.detail || text || 'INTERNAL_ERROR');
+          }
+          return body;
+        },
+        async modelAnswerRag(payload) {
+          const res = await fetch('/rag/model-answer', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
@@ -477,7 +512,9 @@
       function renderRagAnswer(result) {
         const evidence = Array.isArray(result.evidence) ? result.evidence : [];
         return `
+          ${result.warning ? `<div class="notice">${escapeHtml(result.warning)}</div>` : ''}
           <div>${statusPill(result.status || 'UNKNOWN')}</div>
+          ${result.model ? `<div class="subtle">Model: ${escapeHtml(result.model)}</div>` : ''}
           <pre>${escapeHtml(result.answer || '')}</pre>
           ${evidence.length ? `
             <div class="grid">
@@ -526,11 +563,16 @@
       }
 
       document.getElementById('rag-model').addEventListener('change', updateRagModelState);
+      document.getElementById('rag-use-model').addEventListener('change', () => {
+        const enabled = document.getElementById('rag-use-model').checked;
+        document.getElementById('rag-experimental-label').classList.toggle('hidden', !enabled);
+      });
       document.getElementById('rag-form').addEventListener('submit', async (event) => {
         event.preventDefault();
         const model = document.getElementById('rag-model').value;
         const message = document.getElementById('rag-message');
         const output = document.getElementById('rag-output');
+        const useModel = document.getElementById('rag-use-model').checked;
         if (model.startsWith('external/')) {
           message.textContent = 'External providers are not enabled in this HARDENING step.';
           output.innerHTML = '';
@@ -542,11 +584,14 @@
         message.textContent = 'Running RAG...';
         output.innerHTML = '';
         try {
-          const result = await api.answerRag({
+          const payload = {
             query: document.getElementById('rag-query').value,
             top_k: 5,
             model,
-          });
+          };
+          const result = useModel
+            ? await api.modelAnswerRag(payload)
+            : await api.answerRag(payload);
           message.textContent = 'RAG answer ready.';
           output.innerHTML = renderRagAnswer(result);
         } catch (error) {

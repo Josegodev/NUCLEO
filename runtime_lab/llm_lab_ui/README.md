@@ -43,6 +43,7 @@ GET  /api/artifacts/{experiment_id}
 POST /api/experiments
 POST /rag/search
 POST /rag/answer
+POST /rag/model-answer
 ```
 
 Los endpoints RAG son lab-only. No pasan por el runtime principal.
@@ -59,6 +60,7 @@ Estado actual:
 - External providers are not enabled in this HARDENING step.
 - `Run RAG` no llama proveedores externos.
 - `POST /rag/search` existe en backend, pero la UI no lo usa todavia.
+- `POST /rag/model-answer` existe como experimento lab-only.
 
 Las opciones visuales actuales incluyen modelos locales como `llama3.1:8b`, `mistral` y `qwen`, ademas de opciones externas preparadas como `external/openai`, `external/anthropic` y `external/custom`.
 
@@ -68,6 +70,27 @@ Nota de contrato:
 - Actualmente `model` no se pasa a `build_answer()`.
 - Por tanto, seleccionar `llama3.1:8b`, `mistral` o `qwen` todavia no cambia la generacion de respuesta.
 - Los modelos externos siguen bloqueados.
+
+## Estado RAG model-answer
+
+`POST /rag/model-answer` es experimental y lab-only.
+
+Flujo actual:
+
+- Recupera evidencia documental con el RAG existente.
+- Si no hay evidencia, devuelve `EVIDENCE_NOT_FOUND` y no llama al modelo.
+- Si hay evidencia, envia al modelo local seleccionado la pregunta y la evidencia recuperada.
+- La respuesta se marca con `Experimental model answer grounded on retrieved evidence. Not part of NUCLEO runtime.`
+
+Limites:
+
+- No forma parte del runtime principal.
+- No ejecuta Tools.
+- No llama proveedores externos.
+- No introduce claves API.
+- La salida del modelo sigue siendo no determinista.
+- La evidencia recuperada sigue siendo la parte verificable.
+- El modelo recibe evidencia recuperada, pero su respuesta no sustituye contratos del runtime ni documentacion canonica.
 
 ## Estado de integracion
 
@@ -80,7 +103,7 @@ runtime_lab/llm_lab/rag_nucleo_docs/
 Estado actual de integracion:
 
 - La UI consume ese RAG a traves del backend lab-only.
-- El backend expone RAG mediante `POST /rag/search` y `POST /rag/answer`.
+- El backend expone RAG mediante `POST /rag/search`, `POST /rag/answer` y `POST /rag/model-answer`.
 - La UI consume backend lab-only, no runtime.
 - Cualquier futura ampliacion debe hacerse mediante contrato HTTP explicito y validado.
 
@@ -124,8 +147,17 @@ curl -s -X POST http://127.0.0.1:8765/rag/answer \
   -d '{"query":"Que hace dry_run=True?","top_k":5,"model":"external/openai"}'
 ```
 
+Ejemplo experimental con modelo local y evidencia RAG:
+
+```bash
+curl -s -X POST http://127.0.0.1:8765/rag/model-answer \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"Que hace dry_run=True?","top_k":5,"model":"mistral"}'
+```
+
 ## Criterio de aceptacion
 
 - Archivo creado.
 - La documentacion deja claro que `llm_lab_ui` es lab-only.
 - RAG queda documentado como integracion lab-only, no runtime.
+- `rag/model-answer` queda documentado como experimental y no determinista.

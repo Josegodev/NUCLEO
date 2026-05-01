@@ -27,7 +27,7 @@ if str(LLM_LAB_DIR) not in sys.path:
 
 from experiment_runner import default_config, run_experiment  # noqa: E402
 from experiment_validator import ArtifactValidationError, validate_artifact  # noqa: E402
-from model_adapter import OLLAMA_MODEL_ALIASES  # noqa: E402
+from model_adapter import OLLAMA_MODEL_ALIASES, call_model  # noqa: E402
 from rag_nucleo_docs.rag_answer import build_answer  # noqa: E402
 from rag_nucleo_docs.search import search as rag_search  # noqa: E402
 
@@ -40,6 +40,11 @@ DEFAULT_LOCAL_MODELS = ["qwen", "mistral", "llama3.1:8b"]
 MOCK_SUCCESS_MODELS = ["mock/model-a", "mock/model-b", "mock/model-c"]
 MOCK_ERROR_STAGE1 = ["mock/model-a", "mock/model-unavailable", "mock/model-empty"]
 MOCK_ERROR_REVIEWERS = ["mock/model-a", "mock/model-bad-ranking"]
+RAG_MODEL_ANSWER_TIMEOUT_MS = 120000
+RAG_MODEL_ANSWER_WARNING = (
+    "Experimental model answer grounded on retrieved evidence. "
+    "Not part of NUCLEO runtime."
+)
 
 
 app = FastAPI(title="NUCLEO llm_lab UI API")
@@ -92,6 +97,20 @@ class ExperimentRequest(BaseModel):
 
 
 class RagRequest(BaseModel):
+    query: str = Field(min_length=1)
+    top_k: int = Field(default=5, ge=1, le=20)
+    model: str | None = None
+
+    @field_validator("query")
+    @classmethod
+    def query_must_not_be_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("query must not be blank")
+        return value
+
+
+class RagModelAnswerRequest(BaseModel):
     query: str = Field(min_length=1)
     top_k: int = Field(default=5, ge=1, le=20)
     model: str | None = None
@@ -232,6 +251,49 @@ async def answer_rag(request: RagRequest) -> dict[str, object]:
         raise HTTPException(status_code=500, detail="INTERNAL_ERROR") from exc
 
 
+@app.post("/rag/model-answer")
+async def answer_rag_with_model(request: RagModelAnswerRequest) -> dict[str, object]:
+    try:
+        model = _validate_rag_model(request.model, required=True)
+        retrieval = rag_search(request.query, top_k=request.top_k)
+        evidence = _build_model_answer_evidence(retrieval)
+        if not evidence:
+            return {
+                "status": "EVIDENCE_NOT_FOUND",
+                "query": request.query,
+                "model": model,
+                "answer": "",
+                "evidence": [],
+            }
+
+        prompt = _build_model_answer_prompt(request.query, evidence)
+        result = call_model(
+            model,
+            prompt,
+            mode="ollama",
+            timeout_ms=RAG_MODEL_ANSWER_TIMEOUT_MS,
+        )
+        if result.status != "success":
+            raise HTTPException(status_code=502, detail="MODEL_CALL_FAILED")
+
+        return {
+            "status": "MODEL_ANSWER_READY",
+            "query": request.query,
+            "model": model,
+            "answer": result.output or "",
+            "evidence": evidence,
+            "warning": RAG_MODEL_ANSWER_WARNING,
+        }
+    except HTTPException:
+        raise
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail="RAG_INDEX_NOT_FOUND") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="INTERNAL_ERROR") from exc
+
+
 def _read_artifact_file(path: Path) -> dict[str, object]:
     try:
         resolved = path.resolve()
@@ -249,14 +311,68 @@ def _read_artifact_file(path: Path) -> dict[str, object]:
         raise HTTPException(status_code=500, detail=f"Artifact contract violation: {path.name}: {exc}") from exc
 
 
-def _validate_rag_model(model: str | None) -> None:
-    if model is None:
-        return
+def _validate_rag_model(model: str | None, *, required: bool = False) -> str | None:
+    if model is None or not model.strip():
+        if required:
+            raise ValueError("model is required")
+        return None
+    model = model.strip()
     if model in EXTERNAL_RAG_MODELS or model.startswith("external/"):
         raise HTTPException(status_code=400, detail="EXTERNAL_MODEL_NOT_ENABLED")
     if model not in ALLOWED_RAG_MODELS:
         allowed = ", ".join(sorted(ALLOWED_RAG_MODELS))
         raise ValueError(f"Unsupported RAG model: {model}. Allowed models: {allowed}")
+    return model
+
+
+def _build_model_answer_evidence(retrieval: dict[str, object]) -> list[dict[str, object]]:
+    raw_results = retrieval.get("results", [])
+    if not isinstance(raw_results, list):
+        return []
+
+    evidence: list[dict[str, object]] = []
+    for result in raw_results:
+        if not isinstance(result, dict):
+            continue
+        snippet = str(result.get("snippet", "")).strip()
+        if not snippet:
+            continue
+        doc_id = result.get("doc_id")
+        source = result.get("file") or doc_id
+        evidence.append(
+            {
+                "doc_id": doc_id,
+                "source": source,
+                "score": result.get("score"),
+                "snippet": snippet,
+            }
+        )
+    return evidence
+
+
+def _build_model_answer_prompt(query: str, evidence: list[dict[str, object]]) -> str:
+    evidence_blocks = []
+    for index, item in enumerate(evidence, start=1):
+        evidence_blocks.append(
+            "\n".join(
+                [
+                    f"[{index}] source: {item.get('source') or item.get('doc_id') or 'unknown'}",
+                    f"snippet: {item.get('snippet') or ''}",
+                ]
+            )
+        )
+    return (
+        "Responde usando exclusivamente la evidencia proporcionada.\n"
+        "Si la evidencia no contiene la respuesta, responde exactamente:\n"
+        "NO_EVIDENCE_FOR_ANSWER.\n"
+        "No añadas ejemplos externos.\n"
+        "No generalices.\n"
+        "No inventes.\n"
+        "Pregunta:\n"
+        f"{query}\n\n"
+        "Evidencia:\n"
+        + "\n".join(evidence_blocks)
+    )
 
 
 def _validate_experiment_id(experiment_id: str) -> None:
