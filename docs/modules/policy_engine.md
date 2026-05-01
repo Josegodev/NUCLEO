@@ -31,9 +31,23 @@ It returns a `PolicyDecision` with:
 - `validated_fields` must contain `PolicyValidatedField` enum values
 - unknown fields are rejected with `extra="forbid"`
 
+## Approval Flow
+
+`PolicyEngine` is invoked twice in the controlled proposal flow:
+
+- during `POST /agent/run` before returning a dry-run proposal
+- during `POST /agent/approve` before executing the persisted proposal
+
+The approval path passes `dry_run=False` to `PolicyEngine`. If the decision is
+`PolicyDecisionValue.DENY`, the proposal moves to `DENIED` and `tool.run(...)`
+is not called.
+
+The approval endpoint does not reuse the initial policy decision as execution
+authority. The initial decision is persisted for audit context only.
+
 ## What It Does Not Currently Do
 
-- it validates payload shape against the selected tool contract
+- it does not validate payload shape against the selected tool contract
 - it does not make different decisions for `dry_run`; runtime enforces non-execution
 - it does not use `read_only` or `risk_level`
 - it does not govern lab artifact generation directly

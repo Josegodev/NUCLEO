@@ -34,6 +34,7 @@ Uso actual:
 - interpretación de valores ambiguos
 - limpieza de datos no estructurados
 - asistencia en validación
+- augmentación controlada del Planner para producir propuestas estructuradas
 
 El modelo nunca ejecuta directamente acciones:
 todas pasan por validación explícita en el runtime.
@@ -60,16 +61,52 @@ Request
 → Planner  
 → PolicyEngine  
 → ToolRegistry  
-→ Tool  
+→ Tool / Proposal
 → AgentResponse
 
 ### Componentes verificados
 
 - `Planner` adapta intención a una acción candidata determinista.
+- `Planner` puede usar augmentación LLM controlada en `proposal_only`, pero solo
+  para producir una propuesta validada.
 - `ToolRegistry` es la fuente de verdad de tools ejecutables.
 - `PolicyEngine` autoriza la ejecución según autenticación, rol y nombre de tool.
 - `Tool` ejecuta la acción real.
-- `AgentResponse` devuelve `status`, `message` y `result` opcional.
+- `AgentResponse` devuelve `status`, `result`, `errors`, `trace_id` y `version`.
+
+### Agent Runtime (Controlled Execution)
+
+El flujo controlado actual es:
+
+```text
+Request
+-> Planner (determinista + LLM augmentation)
+-> PolicyEngine
+-> ToolRegistry
+-> Proposal (dry_run)
+-> Approval Gate
+-> Execution
+```
+
+Hay tres conceptos separados:
+
+- `proposal_only`: el Planner puede usar el LLM para proponer una acción, pero
+  la salida se normaliza, se parsea como JSON y se valida contra contratos reales
+  de `ToolRegistry`.
+- `approve`: `POST /agent/approve` recibe solo `trace_id` y `approved`; no llama
+  al Planner ni al LLM.
+- execution: una tool solo se ejecuta después de recuperar la proposal
+  persistida, revalidar `PolicyEngine`, resolver de nuevo `ToolRegistry` y
+  validar el payload contra el contrato de la tool.
+
+Garantías actuales:
+
+- el LLM no ejecuta tools
+- `PolicyEngine` interviene antes de cualquier ejecución real
+- la validación de payload es estricta y no acepta campos extra
+- si la salida LLM es inválida, se usa fallback determinista
+- `dry_run=true` no llama a `tool.run(...)`
+- una proposal ya `EXECUTED` no se reejecuta en una segunda aprobación
 
 ## Estado actual del runtime
 
@@ -77,6 +114,7 @@ Request
 
 - API FastAPI funcional
 - Endpoint `POST /agent/run`
+- Endpoint `POST /agent/approve`
 - Endpoint `GET /tools`
 - Endpoint `GET /`
 - Endpoint `GET /health`
@@ -92,19 +130,24 @@ Request
   - Planner devuelve `planned` o `no_plan`
   - `no_plan` no ejecuta tools
   - `dry_run` no ejecuta la tool real
+  - `proposal_only` persiste proposals por `trace_id`
+  - `/agent/approve` ejecuta solo proposals persistidas y aprobadas
   - trazabilidad interna mínima en memoria para el runtime
 
 ### Experimental, no producción
 
 Existen módulos y artefactos de laboratorio aislados en `runtime_lab/`, pero no
-forman parte del contrato estable actual del Planner. El Planner estable solo
-devuelve `planned` o `no_plan`.
+son autoridad de ejecución. La única reutilización productiva actual es
+`runtime_lab/llm_lab/model_adapter.py` a través de
+`app/adapters/model_router.py`, exclusivamente como frontera de modelo para la
+augmentación controlada del Planner.
 
 ### LLM Lab / Ruta lateral experimental
 
 `runtime_lab/llm_lab/` vive dentro del repositorio para facilitar observación y
-consultas locales con Mistral/Qwen, pero no está integrado en el runtime de
-NUCLEO.
+consultas locales con modelos. Sus experimentos siguen fuera del runtime de
+NUCLEO. El runtime productivo no llama directamente a esta capa; usa
+`app/adapters/model_router.py`.
 
 Propósito:
 
@@ -116,7 +159,7 @@ Estado actual:
 
 - experimental
 - ruta lateral de solo observación respecto al runtime productivo
-- sin integración con `AgentService`, `AgentRuntime`, `Planner`,
+- sin autoridad sobre `AgentService`, `AgentRuntime`, `Planner`,
   `PolicyEngine`, `ToolRegistry` ni `Tools`
 
 Prohibido para esta ruta:
@@ -213,19 +256,20 @@ GOOGLE_API_KEY
 Estas claves no se guardan en artefactos. El schema de artefacto sigue siendo
 `llm_lab.experiment.v1`.
 
-### llm_lab UI
+### llm_lab UI / Productive Agent Console v0
 
-`runtime_lab/llm_lab_ui/` contiene una UI local opcional para lanzar
-experimentos y visualizar artefactos.
+`runtime_lab/llm_lab_ui/` contiene actualmente la consola local
+`Productive Agent Console v0`.
 
-La UI:
+La consola:
 
-- interactúa solo con `runtime_lab/llm_lab`
-- lee artefactos desde `runtime_lab/llm_lab/artifacts/`
-- no llama al runtime de NUCLEO
+- llama al endpoint real `POST /agent/run`
+- envía `agent_mode="proposal_only"` y `dry_run=true`
+- permite seleccionar `backend` y `model_id`
+- muestra proposal, modelo usado, backend usado y latencia
+- puede llamar a `POST /agent/approve` para aprobar o rechazar una proposal
 - no ejecuta tools
 - no decide política
-- puede enviar IDs remotos prefijados al runner de `llm_lab`
 - no permite que un LLM ejecute tools ni controle el runtime
 
 Arranque local:
@@ -242,7 +286,7 @@ Abrir:
 http://127.0.0.1:8765/
 ```
 
-Referencia: `runtime_lab/docs/llm_lab_ui_interaction.md`.
+Referencia: `docs_esp/productive_agent_console_v0.md`.
 
 ### Runtime Audit UI (Local Dev)
 
@@ -316,13 +360,12 @@ como dependencias del core. Los informes se guardan bajo `runtime_lab/audit/`.
 
 ### No implementado todavía
 
-- Integración real con LLM para planificación
-- Integración de Mistral/Qwen en el flujo canónico
 - Promoción automática desde staging a producción
 - Ejecución de tools generadas en el registry principal
-- Persistencia operativa del runtime más allá de artefactos de laboratorio
 - Exposición pública de trazas por API
 - Persistencia de trazas fuera de memoria
+- Memoria conversacional
+- Tool chaining o ejecución multi-step
 
 ## Quick start:
 
@@ -360,8 +403,14 @@ Clave de desarrollo disponible en la configuración actual:
 
 ```json
 {
-  "user_input": "system info",
-  "dry_run": true
+  "input": "haz echo de hola",
+  "context": {},
+  "options": {
+    "backend": "openai",
+    "model_id": "gpt-4o-mini",
+    "agent_mode": "proposal_only",
+    "dry_run": true
+  }
 }
 ```
 
@@ -371,21 +420,25 @@ Clave de desarrollo disponible en la configuración actual:
 curl -X POST http://127.0.0.1:8000/agent/run \
   -H "Authorization: Bearer dev-jose-key" \
   -H "Content-Type: application/json" \
-  -d "{\"user_input\": \"system info\", \"dry_run\": true}"
+  -d "{\"input\":\"haz echo de hola\",\"context\":{},\"options\":{\"backend\":\"openai\",\"model_id\":\"gpt-4o-mini\",\"agent_mode\":\"proposal_only\",\"dry_run\":true}}"
 ```
 
 ### Response actual
 
 ```json
 {
-  "status": "dry_run_success",
-  "message": "{'dry_run': True, 'executed': False, 'tool': 'system_info', 'payload': {}}",
+  "status": "success",
   "result": {
     "dry_run": true,
     "executed": false,
-    "tool": "system_info",
-    "payload": {}
-  }
+    "execution_allowed": false,
+    "tool": "echo",
+    "payload": {
+      "text": "hola"
+    },
+    "execution_state": "PROPOSED"
+  },
+  "trace_id": "trace-..."
 }
 ```
 
@@ -395,19 +448,21 @@ ejecutado y marca `executed=false`.
 
 ## Flujo de ejecución
 
-Cliente HTTP  
-↓  
-Uvicorn  
-↓  
-FastAPI (`/agent/run`)  
-↓  
-AgentService  
-↓  
-AgentRuntime  
-↓  
-Planner → PolicyEngine → ToolRegistry → Tool / dry_run  
-↓  
-AgentResponse
+Cliente HTTP
+↓
+FastAPI (`/agent/run`)
+↓
+AgentService
+↓
+AgentRuntime
+↓
+Planner → PolicyEngine → ToolRegistry → dry_run proposal
+↓
+Approval Gate (`/agent/approve`)
+↓
+PolicyEngine → ToolRegistry → Tool
+↓
+AgentResponse / ApprovalResponse
 
 Si el Planner devuelve `no_plan`, el Runtime no consulta PolicyEngine y no
 ejecuta ninguna tool. El Planner no autoriza y no ejecuta; solo propone.

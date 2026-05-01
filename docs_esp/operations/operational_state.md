@@ -1,5 +1,5 @@
 > Archivo origen: `docs/operations/operational_state.md`
-> Última sincronización: `2026-04-26`
+> Última sincronización: `2026-05-01`
 
 # Estado operativo - NUCLEO
 
@@ -21,7 +21,7 @@ AgentRequest
 -> Planner  
 -> PolicyEngine  
 -> ToolRegistry  
--> Tool  
+-> Tool o proposal dry-run
 -> AgentResponse
 
 ## Componentes en operación actual
@@ -30,6 +30,7 @@ AgentRequest
 
 - aplicación FastAPI
 - `POST /agent/run`
+- `POST /agent/approve`
 - `POST /agent/run` acepta `X-Idempotency-Key` opcional
 - `GET /tools`
 - `GET /`
@@ -45,11 +46,14 @@ AgentRequest
 - evalúa policy antes de resolver la instancia ejecutable de la tool
 - valida la salida del planner antes de policy, registry o ejecución de tools
 - devuelve `no_plan` sin ejecutar tools cuando el planner no encuentra una coincidencia determinista
+- persiste proposals dry-run de `proposal_only` por `trace_id`
+- aprueba o rechaza proposals persistidas sin llamar al Planner ni al LLM
 
 ### Planner
 
 - basado en reglas
 - usa una pequeña tabla explícita de reglas deterministas
+- usa augmentación LLM controlada cuando `agent_mode=proposal_only`
 - devuelve `PlannedAction` tipado
 - emite `planned` o `no_plan`
 - no autoriza ni ejecuta tools
@@ -78,7 +82,8 @@ AgentRequest
 ### LLM Lab / Ruta lateral experimental
 
 `runtime_lab/llm_lab/` existe dentro del repositorio, pero es una ruta lateral
-experimental de observación. No forma parte del runtime de producción.
+experimental de observación. No forma parte de la autoridad de ejecución de
+producción.
 
 Propósito:
 
@@ -89,11 +94,12 @@ Propósito:
 
 Integración actual con el runtime:
 
-- ninguna
-- no llama a `AgentService`
-- no llama a `AgentRuntime`
-- no interactúa con `Planner`, `PolicyEngine`, `ToolRegistry` ni `Tools` de
-  producción
+- el runtime de producción no llama directamente a la capa de laboratorio
+- `app/adapters/model_router.py` reutiliza
+  `runtime_lab/llm_lab/model_adapter.py` como adaptador de proveedor de modelo
+  para augmentación controlada del Planner
+- la capa de laboratorio no interactúa por sí misma con `PolicyEngine`,
+  `ToolRegistry` ni `Tools` de producción
 
 Permisos:
 
@@ -125,12 +131,14 @@ Script relacionado de exportación de contexto:
 - `AgentResponse` expone actualmente `result` estructurado
 - el registro de tools de producción ocurre en el registry de producción
 - la salida del planner está tipada como `PlannedAction`
+- la planificación asistida por LLM es solo proposal y valida la salida contra
+  contratos de `ToolRegistry`
 - `dry_run` se impone de forma estructural: las tools no se ejecutan
 - la policy de producción no evalúa el payload en profundidad
 - las tools experimentales generadas no se auto-registran en producción
-- Mistral/Qwen no forman parte del flujo de ejecución de producción
 - la idempotencia de `POST /agent/run` se gestiona en el borde API, antes de que
   `AgentService` delegue en `AgentRuntime`
+- `POST /agent/approve` es idempotente para proposals ya `EXECUTED`
 
 ## Contrato de idempotencia de `/agent/run`
 
@@ -155,12 +163,10 @@ Script relacionado de exportación de contexto:
 
 ## Issues abiertos
 
-- no hay validación completa de payload por tool
 - no existe una taxonomía completa de errores estructurados en runtime
 - la traza del runtime está en memoria y no se expone por API
 - no existe workflow de promoción a producción para tools generadas en laboratorio
-- mezclar salidas de `llm_lab` con decisiones del runtime rompería el límite
-  determinista actual
+- la salida de modelo sigue dependiendo de un contrato JSON estrecho de proposal
 
 ## Reglas de trabajo
 

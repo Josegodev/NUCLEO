@@ -11,7 +11,7 @@ The repository currently provides:
 - FastAPI entrypoint for runtime execution
 - `AgentService` as facade over `AgentRuntime`
 - `AgentRuntime` as production orchestrator
-- Rule-based `Planner`
+- Rule-based `Planner` with controlled LLM augmentation for `proposal_only`
 - Name-based `PolicyEngine` with role check for `system_info`
 - `ToolRegistry` for production tool lookup
 - Production tools:
@@ -23,6 +23,7 @@ The repository currently provides:
   contracts, and execution results
 - `AgentResponse` with closed `status`, optional structured `result`,
   structured `errors`, `trace_id`, and `version`
+- `POST /agent/approve` for controlled execution of persisted proposals
 
 ## Current Experimental State
 
@@ -32,12 +33,13 @@ The repository also contains an isolated experimental lab subsystem:
 - isolated staging registry
 - lab-only skeleton generation
 - audit artifact generation
-- `runtime_lab/llm_lab/` as a lateral local observation path for Mistral/Qwen
-  chats and HARDENING reports
+- `runtime_lab/llm_lab/` as a lateral local observation path for model chats
+  and HARDENING reports
 
 This subsystem is implemented but not part of the stable production registry path.
-Mistral/Qwen are not part of AgentService, Runtime, Planner, PolicyEngine,
-ToolRegistry, or Tools.
+The production runtime uses `app/adapters/model_router.py` as the controlled
+model boundary for Planner augmentation; the lab subsystem itself is not
+execution authority.
 
 ## Main Remaining Weaknesses
 
@@ -51,7 +53,7 @@ ToolRegistry, or Tools.
 
 - `dry_run=True` validates planning, policy, registry, and tracing, but does
   not call `tool.run(...)`
-- policy validates payload shape against the selected tool contract
+- runtime and tools validate payload shape against the selected tool contract
 - `read_only` and `risk_level` metadata are still not policy-enforced
 
 ### 3. Runtime robustness gaps
@@ -100,8 +102,7 @@ ToolRegistry, or Tools.
 - richer artifact metadata
 - explicit promotion process
 - real LLM integration only behind controlled boundaries
-- keep `llm_lab` as observation-only unless a future explicit design changes
-  that boundary
+- keep `llm_lab` itself outside execution authority
 
 ## Not Yet Recommended
 

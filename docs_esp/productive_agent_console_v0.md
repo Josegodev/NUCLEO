@@ -71,6 +71,19 @@ La salida LLM aceptada por `planner_augmentation` es:
 
 `suggested_action` debe corresponder a una tool conocida y registrada. `arguments` se valida con el contrato de payload de la tool.
 
+La salida puede llegar como JSON puro o como JSON envuelto en un fenced block
+Markdown completo. No se acepta texto libre mezclado con JSON.
+
+El prompt de augmentación incluye el catálogo real de tools mediante:
+
+```text
+build_tool_contract_prompt(tool_registry)
+```
+
+Ese catálogo se construye desde `ToolRegistry.list_contracts()`. Por eso el LLM
+recibe los nombres exactos de argumentos, por ejemplo `echo.arguments.text`, y
+no se introducen aliases como `message`.
+
 ## Seguridad
 
 La consola no ejecuta tools.
@@ -195,8 +208,8 @@ El runtime productivo no llama directamente a `llm_lab`.
 
 ## GAP futuros
 
-- Approval gate explícito para pasar de propuesta a ejecución.
 - Historial de conversación persistente.
 - Selector dinámico de modelos disponibles.
 - Observabilidad de trazas desde UI.
 - Gestión segura de credenciales fuera del frontend local.
+- Ejecución multi-step evaluada por separado.

@@ -1,5 +1,5 @@
 > Archivo origen: `docs/architecture.md`
-> Última sincronización: `2026-04-28`
+> Última sincronización: `2026-05-01`
 
 # Arquitectura - Estado actual verificado
 
@@ -29,14 +29,34 @@ AgentRequest
 -> Planner  
 -> PolicyEngine  
 -> ToolRegistry  
--> Tool  
+-> Tool o proposal dry-run
 -> AgentResponse
+
+Flujo de aprobación controlada:
+
+```text
+POST /agent/run
+-> AgentRuntime.run(...)
+-> Planner (determinista + augmentación LLM controlada en proposal_only)
+-> PolicyEngine
+-> ToolRegistry
+-> proposal dry-run persistida por trace_id
+-> POST /agent/approve
+-> AgentRuntime.approve(...)
+-> PolicyEngine
+-> ToolRegistry
+-> tool.run(...)
+-> ApprovalResponse
+```
+
+`/agent/approve` no llama al Planner y no llama a ningún proveedor LLM.
 
 ## Endpoints verificados
 
 - `GET /` -> respuesta de health
 - `GET /tools` -> lista de tools de producción registradas
 - `POST /agent/run` -> ejecuta el runtime del agente
+- `POST /agent/approve` -> aprueba o rechaza una proposal dry-run persistida
 
 ## Responsabilidades verificadas de los componentes
 
@@ -60,18 +80,39 @@ AgentRequest
 - Invoca al policy engine
 - Resuelve tools a través del registry de producción
 - Ejecuta tools de producción
+- Persiste proposals dry-run de `proposal_only` por `trace_id`
+- Aprueba o rechaza proposals persistidas mediante `approve(...)`
 - Registra pasos internos de planner, policy, registry y tool mediante el tracer del runtime
 - Devuelve un artefacto estructurado `AgentResponse`
 
 ### Planner
 
-- Realiza planificación simple basada en reglas
-- Actúa como adaptador determinista de intención a acción candidata
+- Realiza planificación determinista simple basada en reglas
+- Puede usar augmentación LLM controlada cuando
+  `request.options.agent_mode` es `proposal_only`
 - Devuelve un `PlannedAction` tipado y versionado
 - No autoriza ni ejecuta tools
 - Puede emitir:
   - `planned`
   - `no_plan`
+
+La planificación asistida por LLM acepta solo JSON puro o JSON envuelto en un
+fenced block Markdown. El schema aceptado es:
+
+```json
+{
+  "intent": "string",
+  "suggested_action": "echo",
+  "arguments": {
+    "text": "hola"
+  },
+  "confidence": 0.9
+}
+```
+
+`suggested_action` puede ser `null` cuando no encaja ninguna tool registrada.
+Todo nombre de tool y payload aceptado se valida contra los contratos activos
+de `ToolRegistry`. La salida LLM inválida cae al planner determinista.
 
 ### PolicyEngine
 
@@ -88,12 +129,16 @@ AgentRequest
 - Exige que cada tool registrada exponga `ToolContractArtifact`
 - Rechaza nombres duplicados y nombres fuera del conjunto cerrado de producción
 - Resuelve tools por `tool.name`
+- Expone contratos registrados mediante `list_contracts()`
 - Está separado de staging y de los registries experimentales
 
 ### LLM Lab / Ruta lateral experimental
 
-`runtime_lab/llm_lab/` existe dentro del repositorio, pero no forma parte del
-flujo estable de ejecución.
+`runtime_lab/llm_lab/` existe dentro del repositorio, pero no forma parte de la
+autoridad estable de ejecución. El runtime productivo no llama directamente a
+esta capa de laboratorio; la augmentación controlada del Planner usa
+`app/adapters/model_router.py`, que reutiliza
+`runtime_lab/llm_lab/model_adapter.py` solo como adaptador de proveedor.
 
 Puede:
 
@@ -146,10 +191,16 @@ El contrato público del resultado de ejecución es `status`, `result`, `errors`
 Campos actuales:
 
 - `user_input: str`
+- `context: dict`
+- `options: AgentRunOptions | None`
 - `tool: str | None`
 - `payload: dict | None`
 - `dry_run: bool = True`
 - `experimental_tool_generation: bool = False`
+
+`input` se acepta como alias de `user_input`. `AgentRunOptions` contiene
+actualmente `backend`, `model_id`, `agent_mode` y `dry_run`. Cuando
+`agent_mode=proposal_only`, `dry_run` se fuerza a `true`.
 
 La request puede seguir transportando un payload como diccionario, pero el
 payload de la acción planificada se valida contra el contrato de la tool
@@ -214,6 +265,42 @@ Cada `ExecutionStep` contiene:
 La implementación actual es `InMemoryTracer`. No tiene persistencia en disco ni
 integración externa.
 
+### Approval Gate
+
+Las requests de aprobación usan `ApprovalRequest`:
+
+- `trace_id: str`
+- `approved: bool`
+
+Las respuestas usan `ApprovalResponse`:
+
+- `status`: `success`, `denied` o `error`
+- `trace_id`
+- `execution_state`
+- `tool`
+- `executed`
+- `result`
+- `reason`
+
+Estados de ejecución:
+
+- `PROPOSED`
+- `APPROVED`
+- `EXECUTED`
+- `REJECTED`
+- `DENIED`
+- `ERROR`
+
+Invariantes de aprobación:
+
+- la aprobación exige una proposal persistida existente
+- `approved=false` marca `REJECTED` y nunca ejecuta
+- `approved=true` reconstruye el `PlannedAction` persistido
+- la aprobación reevalúa `PolicyEngine` con `dry_run=False`
+- la aprobación resuelve de nuevo la tool mediante `ToolRegistry`
+- la aprobación valida de nuevo el payload persistido antes de `tool.run(...)`
+- una proposal ya `EXECUTED` se devuelve tal cual y no se reejecuta
+
 ## Subsistema experimental verificado
 
 Los módulos experimentales de proposal y staging siguen existiendo en código aislado y en `runtime_lab/`, pero no forman parte del contrato estable actual del Planner.
@@ -248,11 +335,12 @@ Las tools experimentales generadas no se auto-registran en el `ToolRegistry` de 
 
 Lo siguiente no debe describirse como comportamiento implementado en producción:
 
-- Planificación real soportada por LLM
-- Participación de Mistral/Qwen en el runtime de producción
+- Garantía de disponibilidad de modelos locales concretos
 - Autoextensión del registry de producción
 - Instalación dinámica de paquetes
 - Ejecución arbitraria de shell
 - Promoción autónoma desde staging a producción
+- Ejecución multi-step de agentes
+- Memoria conversacional
 
 Esos comportamientos no están implementados o solo aparecen documentados como dirección futura en otros documentos.

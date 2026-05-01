@@ -1,5 +1,5 @@
 > Archivo origen: `docs/operations/session_log.md`
-> Última sincronización: `2026-04-26`
+> Última sincronización: `2026-05-01`
 
 # Session log
 
@@ -229,3 +229,59 @@
   - `message` ya no es el contrato público de respuesta.
   - los estados públicos están cerrados a `success`, `error` y `rejected`.
 - Se reconfirmó que `dry_run=True` no llama a `tool.run(...)`.
+
+### [2026-05-01] LLM Planner Augmentation + Approval Gate
+
+#### Estado inicial
+
+- El planner era principalmente determinista.
+- Productive Agent Console usaba `proposal_only` y `dry_run=true` para generar
+  propuestas.
+- La ejecución controlada posterior a una proposal no estaba documentada como
+  flujo completo proposal -> approval -> execution.
+
+#### Problemas
+
+- La salida LLM podía venir envuelta en fenced JSON Markdown.
+- Las respuestas `no_plan` necesitaban metadata clara cuando fallaba la
+  augmentación.
+- Los argumentos generados por LLM podían desviarse de los contratos reales de
+  tools.
+- La documentación todavía describía la planificación LLM como futura o solo
+  experimental.
+
+#### Cambios
+
+- Se añadió normalización de fenced JSON para JSON puro y bloques Markdown
+  completos con etiqueta `json`.
+- Se añadió inyección dinámica de contratos desde `ToolRegistry.list_contracts()`.
+- Se mantuvo validación estricta de proposals contra contratos registrados de
+  payload.
+- Se añadió metadata de augmentación para diagnóstico de modelo, backend y
+  fallback.
+- Se añadió Approval Gate real en `POST /agent/approve`.
+- Se persistieron proposals dry-run por `trace_id`.
+- Se revalidan `PolicyEngine` y `ToolRegistry` durante la aprobación.
+- Se reforzó idempotencia para que una proposal `EXECUTED` no se ejecute de
+  nuevo.
+
+#### Resultado
+
+- Se pueden producir proposals válidas mediante backends local Ollama u OpenAI.
+- La salida LLM sigue siendo solo proposal y no puede ejecutar tools.
+- La validación de payload sigue siendo estricta; aliases y campos extra se
+  rechazan.
+- La ejecución real queda controlada por approve y usa la proposal persistida.
+
+#### Riesgos
+
+- El output del modelo sigue dependiendo de un contrato JSON estrecho.
+- La ejecución multi-step no está implementada.
+- La memoria conversacional no está implementada.
+- La observabilidad operativa sigue siendo mínima.
+
+#### Próximos pasos
+
+- Mejorar observabilidad de transiciones de aprobación.
+- Mejorar la UX de Productive Agent Console para estados de approval.
+- Evaluar multi-step por separado antes de cualquier implementación.

@@ -5,227 +5,208 @@
 
 ## Estado actual
 
-La ruta de produccion de NUCLEO sigue siendo:
+NUCLEO tiene una frontera de augmentacion LLM controlada dentro del Planner. El
+LLM puede proponer una accion estructurada, pero no puede autorizar, resolver ni
+ejecutar una tool.
+
+El orden de ejecucion de produccion sigue siendo:
 
 ```text
-API -> AgentService -> AgentRuntime -> Planner -> PolicyEngine -> ToolRegistry -> Tool -> AgentResponse
+AgentRequest
+-> AgentService
+-> AgentRuntime
+-> Planner
+-> PolicyEngine
+-> ToolRegistry
+-> Tool o proposal dry-run
+-> AgentResponse
 ```
 
-Contratos de seguridad actuales:
-
-- `Planner` devuelve un `PlannedAction` tipado.
-- `PolicyEngine` mantiene la autoridad para permitir o denegar.
-- `ToolRegistry` mantiene la autoridad sobre las tools registradas.
-- `dry_run=True` nunca llama a `tool.run(...)`.
-- `runtime_lab/llm_lab/` sigue aislado del runtime de produccion.
-
-Este cambio introduce una frontera de augmentacion solo dentro de Planner. No
-conecta ningun proveedor LLM al runtime de produccion.
-
-## Riesgos de introducir LLM
-
-Una salida LLM es probabilistica. Eso significa que no debe tratarse como verdad
-de runtime.
-
-Riesgos principales:
-
-- Texto libre podria confundirse con un plan ejecutable.
-- El modelo podria mencionar una tool desconocida o no registrada.
-- El modelo podria producir un payload que no cumple el contrato de la tool.
-- El modelo podria parecer que se salta `PolicyEngine` si se ejecuta directamente.
-- Se perderia auditoria si no se registra input bruto y output bruto.
-
-La mitigacion es separar responsabilidades: el LLM solo propone. Planner valida
-la propuesta. Runtime sigue pasando el `PlannedAction` por `PolicyEngine`,
-`ToolRegistry` y validacion de input de tool.
-
-## Diseno de PlannerStrategy
-
-`PlannerStrategy` es la interfaz explicita de planificacion:
-
-```text
-AgentRequest -> PlannerStrategy.create_plan(...) -> PlannedAction
-```
-
-Estrategias implementadas:
-
-- `DeterministicPlannerStrategy`: comportamiento actual basado en reglas.
-- `LLMAssistedPlannerStrategy`: stub futuro para propuestas asistidas por LLM.
-
-El comportamiento por defecto sigue siendo determinista porque `Planner()` usa
-`DeterministicPlannerStrategy` salvo que se inyecte otra estrategia
-explicitamente.
-
-`LLMAssistedPlannerStrategy` no llama a un LLM real. Acepta un callback opcional
-de propuesta para pruebas o integracion futura. Si esta desactivado, ausente o
-falla, cae automaticamente al planner determinista.
-
-## Contrato de entrada
-
-La entrada al LLM debe ser siempre estructurada:
+Para Productive Agent Console v0, la request usa:
 
 ```json
 {
-  "goal": "str",
-  "context": ["str"],
-  "constraints": ["str"]
+  "options": {
+    "agent_mode": "proposal_only",
+    "dry_run": true
+  }
 }
 ```
 
-Las restricciones deben dejar claro que el LLM:
+`proposal_only` permite planificacion asistida por LLM. `dry_run=true` impide
+`tool.run(...)`.
 
-- devuelve solo JSON
-- solo propone tools
-- nunca ejecuta tools
-- solo usa tools registradas
-- no puede modificar `ToolRegistry`
-- no puede saltarse `PolicyEngine`
+## Model Router
+
+`app/adapters/model_router.py` es la frontera de modelo que ve el runtime.
+
+Responsabilidades:
+
+- seleccionar `local`, `openai` o `auto`
+- llamar a Ollama local mediante `runtime_lab/llm_lab/model_adapter.py`
+- llamar a OpenAI mediante la API HTTP de chat completions
+- devolver un contrato normalizado unico
+
+Resultado normalizado:
+
+```json
+{
+  "output": "...",
+  "model_used": "...",
+  "backend_used": "...",
+  "latency_ms": 123.0,
+  "fallback_used": false,
+  "fallback_reason": null
+}
+```
+
+El runtime no llama directamente a `runtime_lab/llm_lab`. Llama a
+`ModelRouterProposalProvider`, que llama a `ModelRouter`.
+
+## Contrato del prompt
+
+`ModelRouterProposalProvider` construye un prompt con:
+
+- objetivo del usuario
+- contexto estructurado
+- restricciones fijas de seguridad
+- catalogo activo de contratos de tools
+
+El catalogo se genera mediante:
+
+```text
+build_tool_contract_prompt(tool_registry)
+```
+
+Esa funcion lee `tool_registry.list_contracts()` y renderiza los nombres de
+tools registradas junto con los schemas exactos de argumentos. Esto evita
+parches hardcodeados por tool, como `message -> text`.
+
+Fragmento de catalogo:
+
+```text
+Available tools and required argument schemas:
+
+- echo
+  arguments:
+    text: string
+
+- system_info
+  arguments:
+    {}
+```
+
+Reglas enviadas al modelo:
+
+- usar solo tools listadas
+- usar nombres exactos de argumentos
+- no inventar campos
+- no usar aliases
+- si no encaja ninguna tool, devolver `suggested_action=null` y `arguments={}`
+- devolver solo JSON, opcionalmente envuelto en un fenced block `json`
 
 ## Contrato de salida
 
-La salida del LLM debe ser JSON valido:
+Forma aceptada de salida LLM:
 
 ```json
 {
-  "proposed_plan": [
-    {
-      "tool_name": "echo",
-      "payload": {
-        "text": "hola"
-      }
-    }
-  ],
-  "justification": "echo was requested",
-  "confidence": 0.91
+  "intent": "echo request",
+  "suggested_action": "echo",
+  "arguments": {
+    "text": "hola"
+  },
+  "confidence": 0.9
 }
 ```
 
-El texto libre es invalido. Los campos extra de nivel superior son invalidos.
-Los campos extra dentro de cada step son invalidos.
+`suggested_action` puede ser `null` solo cuando no debe planificarse ninguna
+accion. En ese caso `arguments` debe ser `{}`.
 
-El runtime actual soporta exactamente un `PlannedAction`. Por eso los planes LLM
-con multiples pasos se rechazan hasta que el contrato del runtime se amplie de
-forma deliberada.
+El texto libre es invalido. Los campos extra de payload son invalidos porque los
+payloads se validan contra el contrato Pydantic de la tool seleccionada.
 
-## Validaciones necesarias
+## Normalizacion JSON
 
-`LLMPlanOutputValidator` rechaza:
+`_strip_json_fence(raw)` acepta solo:
 
-- JSON invalido
-- salida que no cumple `LLMPlanProposal`
-- steps no parseables
-- nombres de tool fuera del conjunto cerrado
-- nombres de tool conocidos pero no presentes en el `ToolRegistry` activo
-- payloads que no cumplen el contrato de la tool objetivo
-- propuestas con multiples steps, porque el runtime actual acepta una sola accion
+- JSON puro
+- un fenced block Markdown completo cuya apertura esta vacia o etiquetada como
+  `json` y cuya ultima linea es un cierre de fence
 
-La salida aceptada se convierte en:
+El normalizador no extrae JSON desde texto narrativo. Estos casos son invalidos:
 
-```text
-PlannedAction(source="llm_assisted")
-```
+- texto antes o despues del JSON
+- fence de apertura sin fence de cierre
+- lenguajes de fence distintos de vacio o `json`
 
-Esto sigue siendo solo una propuesta. No es autorizacion.
+La cadena normalizada se pasa a `json.loads(...)`.
 
-## Flujo actualizado
+## Validacion
 
-```text
-API
-  -> AgentService
-  -> AgentRuntime
-  -> Planner
-       -> deterministic strategy
-       -> optional llm_assisted strategy
-            -> structured LLM input
-            -> raw LLM output
-            -> output validation
-            -> fallback to deterministic strategy on failure
-  -> PolicyEngine
-  -> ToolRegistry
-  -> Tool
-  -> AgentResponse
-```
+`LLMPlanOutputValidator` realiza las comprobaciones del lado runtime:
 
-Ninguna tool puede ejecutarse directamente desde la ruta LLM.
+1. parsear JSON
+2. validar campos requeridos
+3. validar rango de `confidence`
+4. aceptar `suggested_action=null` solo con argumentos vacios
+5. validar el nombre de tool contra el conjunto cerrado
+6. verificar que la tool existe en el `ToolRegistry` activo
+7. validar `arguments` con el schema de payload de la tool
+8. convertir la proposal aceptada en `PlannedAction(source="llm_assisted")`
 
-## Trazabilidad
+La proposal aceptada sigue sin ser autorizacion. Runtime pasa el
+`PlannedAction` por `PolicyEngine`, luego por `ToolRegistry` y luego por
+validacion de payload antes de dry-run o ejecucion.
 
-`LLMAssistedPlannerStrategy` registra en memoria:
+## Fallback
 
-- input estructurado enviado a la frontera LLM
-- output bruto devuelto por el proveedor de propuesta
-- output validado cuando se acepta
-- motivo de aceptacion o rechazo
+`LLMAssistedPlannerStrategy` cae al planner determinista cuando:
 
-La implementacion actual no persiste estos registros y no modifica las fases de
-tracing del runtime.
+- falla el backend de modelo seleccionado
+- el output del modelo esta vacio
+- falla la normalizacion o el parseo JSON
+- la forma de la proposal es invalida
+- la tool es desconocida o no registrada
+- el payload no cumple el contrato de la tool seleccionada
 
-## Ejemplo completo
+La metadata de fallback se adjunta al plan resultante cuando esta disponible:
 
-Request:
+- `augmentation_attempted`
+- `backend`
+- `model_id`
+- `backend_used`
+- `model_used`
+- `latency_ms`
+- `fallback_used`
+- `fallback_reason`
 
-```json
-{
-  "user_input": "say hola",
-  "dry_run": true
-}
-```
+Si la planificacion determinista tambien devuelve `no_plan`, la respuesta puede
+ser `rejected`, pero conserva metadata que demuestra que se intento la
+augmentacion.
 
-Input LLM:
+## Frontera de aprobacion
 
-```json
-{
-  "goal": "say hola",
-  "context": [],
-  "constraints": [
-    "Return valid JSON only.",
-    "Propose tools only; never execute tools.",
-    "Use registered tools only.",
-    "PolicyEngine remains the final authority before execution.",
-    "ToolRegistry must not be modified."
-  ]
-}
-```
-
-Output bruto LLM:
-
-```json
-{
-  "proposed_plan": [
-    {
-      "tool_name": "echo",
-      "payload": {
-        "text": "hola"
-      }
-    }
-  ],
-  "justification": "echo was requested",
-  "confidence": 0.91
-}
-```
-
-Resultado de validacion:
+La augmentacion del Planner termina en una proposal. La ejecucion real queda
+controlada por el Approval Gate:
 
 ```text
-accepted=true
-source=llm_assisted
-tool_name=echo
-payload={"text": "hola"}
+PROPOSED -> APPROVED -> EXECUTED
+PROPOSED -> REJECTED
 ```
 
-Resultado de runtime con `dry_run=true`:
+`POST /agent/approve` no llama a `ModelRouter`, no llama a
+`planner_augmentation` y no llama al Planner. Carga la proposal persistida por
+`trace_id`, revalida `PolicyEngine`, resuelve otra vez `ToolRegistry`, valida el
+payload persistido y solo entonces llama a `tool.run(...)`.
 
-```text
-PolicyEngine evalua primero.
-ToolRegistry resuelve la tool.
-El input de tool se valida.
-tool.run(...) no se llama.
-```
+## Invariantes
 
-## Criterios de aceptacion
-
-- El comportamiento determinista no cambia si `llm_assisted` esta desactivado.
-- La salida LLM no puede ejecutar tools.
-- La salida LLM no puede saltarse `PolicyEngine`.
-- La salida LLM no puede modificar `ToolRegistry`.
-- La salida LLM es auditable y rechazable antes de convertirse en `PlannedAction`.
+- La salida LLM nunca se ejecuta directamente.
+- La salida LLM nunca crea un `PolicyDecision`.
+- La salida LLM nunca muta `ToolRegistry`.
+- El frontend no puede editar payloads ejecutables durante aprobación.
+- `PolicyDecisionValue` sigue siendo `ALLOW | DENY`.
+- `dry_run` sigue siendo un flag de ejecución del runtime.
+- La planificación multi-step no está implementada.
+- La memoria conversacional no está implementada.

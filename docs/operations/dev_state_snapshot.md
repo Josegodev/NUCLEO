@@ -6,19 +6,21 @@
 
 ## Current HARDENING Addendum
 
-Updated on 2026-04-28 after artifact-contract hardening.
+Updated on 2026-05-01 after LLM Planner augmentation and Approval Gate
+documentation sync.
 
 This file still preserves the 2026-04-19 snapshot below as history. Current
 verified behavior is:
 
 - phase: HARDENING
 - canonical flow:
-  `Request -> API/FastAPI -> AgentService -> AgentRuntime/Orchestrator -> Planner -> PolicyEngine -> ToolRegistry -> Tool -> AgentResponse`
+  `Request -> API/FastAPI -> AgentService -> AgentRuntime/Orchestrator -> Planner -> PolicyEngine -> ToolRegistry -> Tool or dry-run proposal -> AgentResponse`
 - production tools:
   - `echo`
   - `system_info`
   - `disk_info`
 - Planner returns only `planned` or `no_plan`
+- controlled LLM-assisted planning is active for `agent_mode=proposal_only`
 - `PlannedAction` is versioned and carries preconditions plus expected output
 - `PolicyDecision` is strict, enum-backed, and forbids extra fields
 - `PolicyValidatedField` is a closed enum
@@ -31,9 +33,11 @@ verified behavior is:
 - public execution statuses are closed to `success`, `error`, and `rejected`
 - breaking change: `message` is no longer the public response contract
 - `runtime_lab/llm_lab/` is a lateral experimental observation path only
-- Mistral/Qwen are not integrated with AgentService, Runtime, Planner,
-  PolicyEngine, ToolRegistry, or Tools
+- `app/adapters/model_router.py` reuses `runtime_lab/llm_lab/model_adapter.py`
+  as a model-provider adapter for controlled Planner augmentation
 - no LLM executes tools or calls `/agent/run` automatically
+- `/agent/approve` executes only persisted proposals and does not call Planner
+  or LLM
 
 ## Purpose
 

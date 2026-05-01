@@ -1,5 +1,5 @@
 > Archivo origen: `docs/modules/tool_registry.md`
-> Última sincronización: `2026-04-28`
+> Última sincronización: `2026-05-01`
 
 # ToolRegistry
 
@@ -31,6 +31,29 @@ El registro exige:
 - que la tool exponga un `ToolContractArtifact`
 - que el nombre del contrato coincida con `tool.name`
 - que el nombre no esté ya registrado
+
+## Impacto en augmentación LLM
+
+`ToolRegistry` también es la fuente de verdad para el catálogo de contratos que
+se muestra al prompt de augmentación del Planner.
+
+`build_tool_contract_prompt(tool_registry)` lee:
+
+```text
+tool_registry.list_contracts()
+```
+
+y renderiza los nombres de tools registradas junto con sus campos de argumentos
+requeridos. Así el prompt queda alineado con los mismos contratos que después
+usa la validación del runtime.
+
+Frontera importante:
+
+- `ToolRegistry` no llama a proveedores LLM
+- `ToolRegistry` no ejecuta desde contenido de prompt
+- `ToolRegistry` no acepta nombres de tool desde `/agent/approve`
+- la ejecución sigue requiriendo orquestación del runtime, `PolicyEngine`,
+  validación de payload y después `tool.run(...)`
 
 ## Distinción importante
 

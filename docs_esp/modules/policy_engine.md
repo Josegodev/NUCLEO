@@ -1,5 +1,5 @@
 > Archivo origen: `docs/modules/policy_engine.md`
-> Última sincronización: `2026-04-28`
+> Última sincronización: `2026-05-01`
 
 # PolicyEngine
 
@@ -34,9 +34,23 @@ Devuelve una `PolicyDecision` con:
 - `validated_fields` debe contener valores enum `PolicyValidatedField`
 - los campos desconocidos se rechazan con `extra="forbid"`
 
+## Flujo de aprobación
+
+`PolicyEngine` se invoca dos veces en el flujo controlado de proposals:
+
+- durante `POST /agent/run`, antes de devolver una proposal dry-run
+- durante `POST /agent/approve`, antes de ejecutar la proposal persistida
+
+La ruta de aprobación llama a `PolicyEngine` con `dry_run=False`. Si la decisión
+es `PolicyDecisionValue.DENY`, la proposal pasa a `DENIED` y `tool.run(...)` no
+se llama.
+
+El endpoint de aprobación no reutiliza la decisión inicial como autoridad de
+ejecución. La decisión inicial queda persistida solo como contexto de auditoría.
+
 ## Lo que actualmente no hace
 
-- valida la forma del payload contra el contrato de la tool seleccionada
+- no valida la forma del payload contra el contrato de la tool seleccionada
 - no toma decisiones diferentes por `dry_run`; el runtime impone la no ejecución
 - no usa `read_only` ni `risk_level`
 - no gobierna directamente la generación de artefactos del laboratorio

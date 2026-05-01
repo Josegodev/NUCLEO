@@ -29,6 +29,29 @@ Registration requires:
 - the contract name matches `tool.name`
 - the name has not already been registered
 
+## Impact on LLM Augmentation
+
+`ToolRegistry` is now also the source of truth for the tool contract catalog
+shown to the Planner augmentation prompt.
+
+`build_tool_contract_prompt(tool_registry)` reads:
+
+```text
+tool_registry.list_contracts()
+```
+
+and renders the registered tool names plus their required argument fields. This
+keeps the prompt aligned with the same contracts used later by runtime
+validation.
+
+Important boundary:
+
+- `ToolRegistry` does not call LLM providers
+- `ToolRegistry` does not execute from prompt content
+- `ToolRegistry` does not accept tool names from `/agent/approve`
+- execution still requires runtime orchestration, `PolicyEngine`, payload
+  validation, and then `tool.run(...)`
+
 ## Important Distinction
 
 This registry is the production registry. It is separate from:

@@ -18,7 +18,7 @@ AgentRequest
 → Planner  
 → PolicyEngine  
 → ToolRegistry  
-→ Tool  
+→ Tool or dry-run proposal
 → AgentResponse
 
 ## Components in Current Operation
@@ -27,6 +27,7 @@ AgentRequest
 
 - FastAPI application
 - `POST /agent/run`
+- `POST /agent/approve`
 - `POST /agent/run` accepts optional `X-Idempotency-Key`
 - `GET /tools`
 - `GET /`
@@ -42,11 +43,14 @@ AgentRequest
 - Evaluates policy before resolving the executable tool instance
 - Validates planner output before policy, registry, or tool execution
 - Returns `no_plan` without executing tools when planner has no deterministic match
+- Persists `proposal_only` dry-run proposals by `trace_id`
+- Approves or rejects persisted proposals without calling Planner or LLM
 
 ### Planner
 
 - Rule-based
 - Uses a small explicit table of deterministic rules
+- Uses controlled LLM augmentation when `agent_mode=proposal_only`
 - Returns typed `PlannedAction`
 - Emits `planned` or `no_plan`
 - Does not authorize or execute tools
@@ -75,7 +79,8 @@ AgentRequest
 ### LLM Lab / Experimental Side Path
 
 `runtime_lab/llm_lab/` exists inside the repository, but it is a lateral
-experimental observation path. It is not part of the production runtime.
+experimental observation path. It is not part of the production execution
+authority.
 
 Purpose:
 
@@ -86,11 +91,11 @@ Purpose:
 
 Current integration with runtime:
 
-- none
-- no calls to `AgentService`
-- no calls to `AgentRuntime`
-- no interaction with `Planner`, `PolicyEngine`, `ToolRegistry`, or production
-  `Tools`
+- production runtime does not call the lab layer directly
+- `app/adapters/model_router.py` reuses `runtime_lab/llm_lab/model_adapter.py`
+  as a model-provider adapter for controlled Planner augmentation
+- no interaction with `PolicyEngine`, `ToolRegistry`, or production `Tools`
+  happens from the lab layer itself
 
 Permissions:
 
@@ -122,12 +127,14 @@ Related context-export script:
 - `AgentResponse` currently exposes structured `result`
 - Production tool registration happens in the production tool registry
 - Planner output is typed as `PlannedAction`
+- LLM-assisted planning is proposal-only and validates output against
+  `ToolRegistry` contracts
 - `dry_run` is structurally enforced: tools are not executed
 - Production policy does not deeply evaluate payload
 - Experimental generated tools are not auto-registered in production
-- Mistral/Qwen are not part of the production execution flow
 - `POST /agent/run` idempotency is handled at the API boundary, before
   `AgentService` delegates into `AgentRuntime`
+- `POST /agent/approve` is idempotent for already `EXECUTED` proposals
 
 ## `/agent/run` Idempotency Contract
 
@@ -152,12 +159,10 @@ Related context-export script:
 
 ## Open Issues
 
-- No complete payload validation per tool
 - No full structured runtime error taxonomy
 - Runtime trace is in-memory only and not exposed through API
 - No production promotion workflow for lab-generated tools
-- Mixing `llm_lab` outputs with runtime decisions would break the current
-  deterministic boundary
+- Model output still depends on a narrow JSON proposal contract
 
 ## Working Rules
 

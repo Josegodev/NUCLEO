@@ -257,3 +257,51 @@
   - `message` is no longer the public response contract.
   - public statuses are closed to `success`, `error`, and `rejected`.
 - Reconfirmed `dry_run=True` does not call `tool.run(...)`.
+
+### [2026-05-01] LLM Planner Augmentation + Approval Gate
+
+#### Initial State
+
+- Planner was primarily deterministic.
+- Productive Agent Console proposals used `proposal_only` and `dry_run=true`.
+- Controlled execution after a proposal was not documented as a complete
+  proposal -> approval -> execution flow.
+
+#### Problems
+
+- LLM output could be wrapped in Markdown fenced JSON.
+- `no_plan` responses lacked clear augmentation metadata when model output
+  failed.
+- LLM-generated arguments could drift from real tool contracts.
+- Documentation still described LLM planning as future or experimental only.
+
+#### Changes
+
+- Added fenced JSON normalization for pure JSON and full ```json ... ``` blocks.
+- Added dynamic tool contract injection from `ToolRegistry.list_contracts()`.
+- Kept strict proposal validation against registered tool payload contracts.
+- Added augmentation metadata for model/backend/fallback diagnostics.
+- Added the real Approval Gate at `POST /agent/approve`.
+- Persisted dry-run proposals by `trace_id`.
+- Revalidated `PolicyEngine` and `ToolRegistry` during approval.
+- Enforced idempotency so an `EXECUTED` proposal is not executed again.
+
+#### Result
+
+- Valid proposals can be produced through local Ollama or OpenAI backends.
+- LLM output remains proposal-only and cannot execute tools.
+- Payload validation remains strict; aliases and extra fields are rejected.
+- Real execution is controlled through approval and uses the persisted proposal.
+
+#### Risks
+
+- Model output still depends on a narrow JSON contract.
+- Multi-step execution is not implemented.
+- Conversational memory is not implemented.
+- Operational observability remains minimal.
+
+#### Next Steps
+
+- Improve observability around approval transitions.
+- Improve Productive Agent Console UX for approval state.
+- Evaluate multi-step execution separately before any implementation.

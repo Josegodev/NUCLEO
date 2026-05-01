@@ -1,5 +1,5 @@
 > Archivo origen: `docs/operations/dev_state_snapshot.md`
-> Última sincronización: `2026-04-28`
+> Última sincronización: `2026-05-01`
 
 # Snapshot del estado de desarrollo - NUCLEO
 
@@ -9,19 +9,22 @@
 
 ## Suplemento actual HARDENING
 
-Actualizado el 2026-04-28 tras endurecer los contratos de artefactos.
+Actualizado el 2026-05-01 tras sincronizar la documentación de augmentación LLM
+del Planner y Approval Gate.
 
 Este archivo conserva debajo el snapshot del 2026-04-19 como historia. El
 comportamiento verificado actual es:
 
 - fase: HARDENING
 - flujo canónico:
-  `Request -> API/FastAPI -> AgentService -> AgentRuntime/Orchestrator -> Planner -> PolicyEngine -> ToolRegistry -> Tool -> AgentResponse`
+  `Request -> API/FastAPI -> AgentService -> AgentRuntime/Orchestrator -> Planner -> PolicyEngine -> ToolRegistry -> Tool o proposal dry-run -> AgentResponse`
 - tools de producción:
   - `echo`
   - `system_info`
   - `disk_info`
 - el Planner solo devuelve `planned` o `no_plan`
+- la planificación asistida por LLM controlada está activa para
+  `agent_mode=proposal_only`
 - `PlannedAction` está versionado e incluye precondiciones y salida esperada
 - `PolicyDecision` es estricto, basado en enum y prohíbe campos extra
 - `PolicyValidatedField` es un enum cerrado
@@ -35,9 +38,12 @@ comportamiento verificado actual es:
   `rejected`
 - breaking change: `message` ya no es el contrato público de respuesta
 - `runtime_lab/llm_lab/` es solo una ruta lateral experimental de observación
-- Mistral/Qwen no están integrados con AgentService, Runtime, Planner,
-  PolicyEngine, ToolRegistry ni Tools
+- `app/adapters/model_router.py` reutiliza
+  `runtime_lab/llm_lab/model_adapter.py` como adaptador de proveedor de modelo
+  para augmentación controlada del Planner
 - ningún LLM ejecuta tools ni llama automáticamente a `/agent/run`
+- `/agent/approve` ejecuta solo proposals persistidas y no llama al Planner ni
+  al LLM
 
 ## Propósito
 

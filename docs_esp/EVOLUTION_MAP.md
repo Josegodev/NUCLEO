@@ -1,5 +1,5 @@
 > Archivo origen: `docs/EVOLUTION_MAP.md`
-> Última sincronización: `2026-04-28`
+> Última sincronización: `2026-05-01`
 
 # Mapa de evolución
 
@@ -14,7 +14,7 @@ El repositorio ofrece actualmente:
 - entrypoint FastAPI para ejecución del runtime
 - `AgentService` como fachada sobre `AgentRuntime`
 - `AgentRuntime` como orquestador de producción
-- `Planner` basado en reglas
+- `Planner` basado en reglas con augmentación LLM controlada para `proposal_only`
 - `PolicyEngine` name-based con comprobación de rol para `system_info`
 - `ToolRegistry` para resolución de tools de producción
 - tools de producción:
@@ -26,6 +26,7 @@ El repositorio ofrece actualmente:
   policy, contratos de tool y resultados de ejecución
 - `AgentResponse` con `status` cerrado, `result` estructurado opcional,
   `errors`, `trace_id` y `version`
+- `POST /agent/approve` para ejecución controlada de proposals persistidas
 
 ## Estado experimental actual
 
@@ -35,12 +36,13 @@ El repositorio también contiene un subsistema experimental de laboratorio aisla
 - staging registry aislado
 - generación de skeletons solo de laboratorio
 - generación de artefactos de audit
-- `runtime_lab/llm_lab/` como ruta lateral local de observación para chats
-  Mistral/Qwen e informes HARDENING
+- `runtime_lab/llm_lab/` como ruta lateral local de observación para chats de
+  modelos e informes HARDENING
 
 Este subsistema está implementado, pero no forma parte de la ruta estable del registry de producción.
-Mistral/Qwen no forman parte de AgentService, Runtime, Planner, PolicyEngine,
-ToolRegistry ni Tools.
+El runtime de producción usa `app/adapters/model_router.py` como frontera
+controlada de modelo para augmentación del Planner; el subsistema de laboratorio
+en sí no es autoridad de ejecución.
 
 ## Principales debilidades pendientes
 
@@ -55,7 +57,8 @@ ToolRegistry ni Tools.
 
 - `dry_run=True` valida planificación, policy, registry y tracing, pero no
   llama a `tool.run(...)`
-- la policy valida la forma del payload contra el contrato de la tool seleccionada
+- el runtime y las tools validan la forma del payload contra el contrato de la
+  tool seleccionada
 - los metadatos `read_only` y `risk_level` aún no se aplican desde policy
 
 ### 3. Gaps de robustez del runtime
@@ -104,8 +107,7 @@ ToolRegistry ni Tools.
 - metadatos más ricos en artefactos
 - proceso explícito de promoción
 - integración real con LLM solo detrás de límites controlados
-- mantener `llm_lab` como ruta de solo observación salvo que un diseño futuro
-  explícito cambie ese límite
+- mantener `llm_lab` en sí fuera de la autoridad de ejecución
 
 ## Aún no recomendado
 
