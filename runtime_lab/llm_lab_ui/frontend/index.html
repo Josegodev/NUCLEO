@@ -3,19 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>NUCLEO llm_lab UI</title>
+    <title>Productive Agent Console v0</title>
     <style>
       :root {
         color-scheme: light;
-        --bg: #f7f7f4;
+        --bg: #f5f6f4;
         --panel: #ffffff;
-        --text: #1c1f23;
-        --muted: #646b73;
-        --line: #d9ddd8;
-        --accent: #18635a;
-        --error: #a33a2f;
+        --text: #1d2329;
+        --muted: #66707a;
+        --line: #d7ddd8;
+        --accent: #145c55;
+        --accent-strong: #0d403b;
+        --danger: #a33a2f;
         --ok: #236b3f;
-        --warn: #936514;
+        --code: #f0f2ee;
       }
 
       * {
@@ -24,136 +25,136 @@
 
       body {
         margin: 0;
-        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        min-height: 100vh;
         background: var(--bg);
         color: var(--text);
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       }
 
       header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
         border-bottom: 1px solid var(--line);
         background: var(--panel);
-        padding: 14px 20px;
+        padding: 14px 18px;
+      }
+
+      h1,
+      h2 {
+        margin: 0;
+        line-height: 1.2;
       }
 
       h1 {
         font-size: 18px;
-        line-height: 1.2;
-        margin: 0;
       }
 
-      .subtle {
-        color: var(--muted);
-        font-size: 13px;
+      h2 {
+        font-size: 15px;
       }
 
       main {
         display: grid;
-        grid-template-columns: 360px minmax(0, 1fr);
-        gap: 16px;
-        padding: 16px;
-      }
-
-      section,
-      aside,
-      .card {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 8px;
+        grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+        gap: 14px;
+        padding: 14px;
       }
 
       aside,
       section {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
         padding: 14px;
+      }
+
+      .stack {
+        display: grid;
+        gap: 14px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
       }
 
       label {
         display: block;
+        margin: 12px 0 6px;
         font-size: 13px;
         font-weight: 650;
-        margin: 12px 0 6px;
       }
 
-      textarea,
       input,
       select,
+      textarea,
       button {
         font: inherit;
       }
 
-      textarea,
       input,
-      select {
+      select,
+      textarea {
         width: 100%;
         border: 1px solid var(--line);
         border-radius: 6px;
-        padding: 9px 10px;
         background: #fff;
+        color: var(--text);
+        padding: 9px 10px;
       }
 
       textarea {
-        min-height: 130px;
+        min-height: 150px;
         resize: vertical;
       }
 
       button {
+        width: 100%;
+        min-height: 38px;
+        margin-top: 12px;
         border: 0;
         border-radius: 6px;
         background: var(--accent);
-        color: white;
-        padding: 9px 12px;
+        color: #fff;
         cursor: pointer;
-        margin-top: 12px;
-        width: 100%;
+        font-weight: 700;
+      }
+
+      button:hover {
+        background: var(--accent-strong);
       }
 
       button:disabled {
-        opacity: 0.55;
         cursor: not-allowed;
+        opacity: 0.6;
       }
 
-      .layout-stack {
+      .row {
         display: grid;
-        gap: 16px;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
       }
 
-      .artifact-list {
-        display: grid;
-        gap: 8px;
-        margin-top: 10px;
-      }
-
-      .artifact-item {
-        text-align: left;
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        min-height: 38px;
         border: 1px solid var(--line);
-        background: #fff;
-        color: var(--text);
-        width: 100%;
+        border-radius: 6px;
+        padding: 8px 10px;
+      }
+
+      .toggle-row label {
         margin: 0;
       }
 
-      .artifact-item.active {
-        outline: 2px solid var(--accent);
-      }
-
-      .status {
-        display: inline-block;
-        border-radius: 999px;
-        padding: 2px 8px;
-        font-size: 12px;
-        font-weight: 700;
-        border: 1px solid currentColor;
-      }
-
-      .status.success {
-        color: var(--ok);
-      }
-
-      .status.partial_success {
-        color: var(--warn);
-      }
-
-      .status.error {
-        color: var(--error);
+      .toggle-row input {
+        width: auto;
       }
 
       .toolbar {
@@ -164,448 +165,168 @@
         margin-bottom: 10px;
       }
 
-      .grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-        gap: 10px;
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        border: 1px solid currentColor;
+        border-radius: 999px;
+        padding: 2px 9px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
       }
 
-      .card {
-        padding: 12px;
+      .pill.success {
+        color: var(--ok);
       }
 
-      .card h3,
-      section h2 {
-        margin: 0 0 8px;
+      .pill.error,
+      .pill.rejected {
+        color: var(--danger);
       }
 
-      section h2 {
-        font-size: 16px;
+      .muted {
+        color: var(--muted);
+        font-size: 13px;
       }
 
-      .mono {
+      .metric {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px;
+      }
+
+      .metric .value {
+        margin-top: 4px;
+        font-size: 14px;
+        font-weight: 750;
+        word-break: break-word;
+      }
+
+      pre {
+        min-height: 80px;
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: var(--code);
+        padding: 10px;
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         font-size: 12px;
       }
 
-      pre {
-        white-space: pre-wrap;
-        word-break: break-word;
-        margin: 8px 0 0;
-        background: #f3f4f0;
-        border: 1px solid var(--line);
-        border-radius: 6px;
-        padding: 10px;
-      }
-
-      table {
-        border-collapse: collapse;
-        width: 100%;
-      }
-
-      th,
-      td {
-        border-bottom: 1px solid var(--line);
-        padding: 7px;
-        text-align: left;
-      }
-
-      .error-panel {
-        border-left: 4px solid var(--error);
-      }
-
-      .notice {
-        border: 1px solid var(--line);
-        border-left: 4px solid var(--warn);
-        border-radius: 6px;
-        background: #fff8e5;
-        color: var(--warn);
-        margin-top: 10px;
-        padding: 9px 10px;
-      }
-
-      .inline-control {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 13px;
-        font-weight: 650;
-        margin: 12px 0 6px;
-      }
-
-      .inline-control input {
-        width: auto;
-      }
-
-      .hidden {
-        display: none;
-      }
-
       @media (max-width: 900px) {
-        main {
+        main,
+        .row,
+        .grid {
           grid-template-columns: 1fr;
+        }
+
+        header {
+          align-items: flex-start;
+          flex-direction: column;
         }
       }
     </style>
   </head>
   <body>
     <header>
-      <h1>NUCLEO llm_lab UI</h1>
-      <div class="subtle">Local lab surface only. No Runtime, no tools, no policy, no external APIs.</div>
+      <div>
+        <h1>Productive Agent Console v0</h1>
+        <div class="muted">POST /agent/run</div>
+      </div>
+      <span id="status-pill" class="pill">idle</span>
     </header>
 
     <main>
       <aside>
-        <h2>Run Experiment</h2>
-        <form id="run-form">
-          <label for="prompt">Prompt</label>
-          <textarea id="prompt" required>Compare local inference and remote inference for HARDENING.</textarea>
+        <form id="agent-form">
+          <label for="api-base">Runtime URL</label>
+          <input id="api-base" value="http://127.0.0.1:8000" autocomplete="off" />
 
-          <label for="mode">Mode</label>
-          <select id="mode">
-            <option value="mock">mock errors</option>
-            <option value="mock-success">mock success</option>
-            <option value="ollama">ollama</option>
-          </select>
+          <label for="api-key">API key</label>
+          <input id="api-key" value="dev-jose-key" autocomplete="off" />
 
-          <label for="stage1">Stage 1 models</label>
-          <input id="stage1" value="qwen,mistral,llama3.1:8b" />
+          <div class="row">
+            <div>
+              <label for="backend">Backend</label>
+              <select id="backend">
+                <option value="auto">auto</option>
+                <option value="local">local</option>
+                <option value="openai">openai</option>
+              </select>
+            </div>
+            <div>
+              <label for="model-id">Model</label>
+              <select id="model-id">
+                <option value="llama3.1:8b">llama3.1:8b</option>
+                <option value="qwen">qwen</option>
+                <option value="mistral">mistral</option>
+                <option value="gpt-4o-mini">gpt-4o-mini</option>
+              </select>
+            </div>
+          </div>
 
-          <label for="stage2">Stage 2 reviewers</label>
-          <input id="stage2" value="qwen,mistral,llama3.1:8b" />
+          <label for="message">Message</label>
+          <textarea id="message" required>Show disk info for path=/</textarea>
 
-          <label for="chairman">Chairman</label>
-          <input id="chairman" value="qwen" />
+          <div class="row">
+            <div class="toggle-row">
+              <label for="proposal-only">proposal_only</label>
+              <input id="proposal-only" type="checkbox" checked disabled />
+            </div>
+            <div class="toggle-row">
+              <label for="dry-run">dry_run</label>
+              <input id="dry-run" type="checkbox" checked disabled />
+            </div>
+          </div>
 
           <button id="run-button" type="submit">Run</button>
         </form>
-
-        <p id="run-message" class="subtle"></p>
-
-        <div class="toolbar">
-          <h2>Artifacts</h2>
-          <button id="refresh" type="button" style="width:auto;margin:0;">Refresh</button>
-        </div>
-        <div id="artifact-list" class="artifact-list"></div>
+        <p id="message-line" class="muted"></p>
       </aside>
 
-      <div class="layout-stack">
+      <div class="stack">
         <section>
           <div class="toolbar">
-            <h2>RAG Docs</h2>
-            <span class="status partial_success">prepared</span>
+            <h2>Response</h2>
+            <span id="response-status" class="pill">pending</span>
           </div>
-          <form id="rag-form">
-            <label for="rag-query">Document query</label>
-            <textarea id="rag-query" placeholder="Ask a question about NUCLEO documentation."></textarea>
-
-            <label for="rag-model">Model</label>
-            <select id="rag-model">
-              <option value="llama3.1:8b">llama3.1:8b</option>
-              <option value="mistral">mistral</option>
-              <option value="qwen">qwen</option>
-              <option value="external/openai">external/openai</option>
-              <option value="external/anthropic">external/anthropic</option>
-              <option value="external/custom">external/custom</option>
-            </select>
-
-            <div id="rag-external-warning" class="notice hidden">
-              External providers are not enabled in this HARDENING step.
-            </div>
-
-            <div id="rag-custom-model-wrap" class="hidden">
-              <label for="rag-custom-model">Custom external model</label>
-              <input id="rag-custom-model" placeholder="provider/model-name" />
-            </div>
-
-            <label class="inline-control" for="rag-use-model">
-              <input id="rag-use-model" type="checkbox" />
-              <span>Ask selected local model using retrieved evidence</span>
-            </label>
-
-            <div id="rag-experimental-label" class="notice hidden">
-              Experimental &mdash; model output constrained by RAG evidence
-            </div>
-
-            <button id="rag-run-button" type="submit">Run RAG</button>
-          </form>
-          <p id="rag-message" class="subtle">Ready to query the lab-only RAG backend.</p>
-          <div id="rag-output"></div>
+          <pre id="response-output"></pre>
         </section>
 
         <section>
-          <div class="toolbar">
-            <h2>Artifact Detail</h2>
-            <span id="artifact-status"></span>
+          <h2>Proposal</h2>
+          <pre id="proposal-output"></pre>
+        </section>
+
+        <section>
+          <h2>Runtime Metadata</h2>
+          <div class="grid">
+            <div class="metric">
+              <div class="muted">backend_used</div>
+              <div id="backend-used" class="value">-</div>
+            </div>
+            <div class="metric">
+              <div class="muted">model_used</div>
+              <div id="model-used" class="value">-</div>
+            </div>
+            <div class="metric">
+              <div class="muted">latency_ms</div>
+              <div id="latency-ms" class="value">-</div>
+            </div>
           </div>
-          <div id="artifact-summary" class="subtle">Select or run an experiment.</div>
         </section>
 
         <section>
-          <h2>Stage 1 Responses</h2>
-          <div id="stage1-output" class="grid"></div>
-        </section>
-
-        <section>
-          <h2>Stage 2 Reviews</h2>
-          <div id="stage2-output" class="grid"></div>
-        </section>
-
-        <section>
-          <h2>Aggregate Rankings</h2>
-          <div id="aggregate-output"></div>
-        </section>
-
-        <section>
-          <h2>Stage 3 Synthesis</h2>
-          <div id="stage3-output"></div>
+          <h2>Raw Result</h2>
+          <pre id="raw-output"></pre>
         </section>
       </div>
     </main>
 
-    <script>
-      const api = {
-        async listArtifacts() {
-          const res = await fetch('/api/artifacts');
-          if (!res.ok) throw new Error(await res.text());
-          return res.json();
-        },
-        async getArtifact(id) {
-          const res = await fetch(`/api/artifacts/${encodeURIComponent(id)}`);
-          if (!res.ok) throw new Error(await res.text());
-          return res.json();
-        },
-        async createExperiment(payload) {
-          const res = await fetch('/api/experiments', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-          if (!res.ok) throw new Error(await res.text());
-          return res.json();
-        },
-        async answerRag(payload) {
-          const res = await fetch('/rag/answer', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-          const text = await res.text();
-          const body = text ? JSON.parse(text) : {};
-          if (!res.ok) {
-            throw new Error(body.detail || text || 'INTERNAL_ERROR');
-          }
-          return body;
-        },
-        async modelAnswerRag(payload) {
-          const res = await fetch('/rag/model-answer', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-          const text = await res.text();
-          const body = text ? JSON.parse(text) : {};
-          if (!res.ok) {
-            throw new Error(body.detail || text || 'INTERNAL_ERROR');
-          }
-          return body;
-        },
-      };
-
-      let selectedId = null;
-
-      function csv(value) {
-        return value.split(',').map((item) => item.trim()).filter(Boolean);
-      }
-
-      function escapeHtml(value) {
-        return String(value ?? '')
-          .replaceAll('&', '&amp;')
-          .replaceAll('<', '&lt;')
-          .replaceAll('>', '&gt;')
-          .replaceAll('"', '&quot;')
-          .replaceAll("'", '&#039;');
-      }
-
-      function statusPill(status) {
-        return `<span class="status ${escapeHtml(status)}">${escapeHtml(status)}</span>`;
-      }
-
-      async function refreshArtifacts() {
-        const list = await api.listArtifacts();
-        const root = document.getElementById('artifact-list');
-        root.innerHTML = list.map((item) => `
-          <button class="artifact-item ${item.experiment_id === selectedId ? 'active' : ''}" data-id="${escapeHtml(item.experiment_id)}" ${item.contract_valid === false ? 'disabled' : ''}>
-            <div>${statusPill(item.status)} <span class="mono">${escapeHtml(item.experiment_id)}</span></div>
-            <div class="subtle">${escapeHtml(item.created_at)}</div>
-            <div>${escapeHtml(item.input_preview)}</div>
-            ${item.contract_valid === false ? `<div class="subtle">${escapeHtml(item.contract_error)}</div>` : ''}
-          </button>
-        `).join('');
-        root.querySelectorAll('button[data-id]:not(:disabled)').forEach((button) => {
-          button.addEventListener('click', () => loadArtifact(button.dataset.id).catch((error) => {
-            document.getElementById('artifact-summary').textContent = `Error: ${error.message}`;
-          }));
-        });
-      }
-
-      async function loadArtifact(id) {
-        selectedId = id;
-        const artifact = await api.getArtifact(id);
-        renderArtifact(artifact);
-        await refreshArtifacts();
-      }
-
-      function renderArtifact(artifact) {
-        document.getElementById('artifact-status').innerHTML = statusPill(artifact.status);
-        document.getElementById('artifact-summary').innerHTML = `
-          <div><strong>ID:</strong> <span class="mono">${escapeHtml(artifact.experiment_id)}</span></div>
-          <div><strong>Created:</strong> ${escapeHtml(artifact.created_at)}</div>
-          <div><strong>Completed:</strong> ${escapeHtml(artifact.completed_at)}</div>
-          <div><strong>Mode:</strong> ${escapeHtml(artifact.config?.backend_profile)}</div>
-          <div><strong>Input:</strong> ${escapeHtml(artifact.input?.user_input)}</div>
-        `;
-
-        document.getElementById('stage1-output').innerHTML = artifact.stage1_responses.map((item) => renderStageCard(item.model_id, item.response, item)).join('');
-        document.getElementById('stage2-output').innerHTML = artifact.stage2_reviews.map((item) => {
-          const ranking = item.parsed_ranking?.length ? `<pre>${escapeHtml(item.parsed_ranking.join('\\n'))}</pre>` : '';
-          return renderStageCard(item.reviewer_model_id, item.raw_review_text, item, ranking);
-        }).join('');
-        document.getElementById('aggregate-output').innerHTML = renderAggregate(artifact.aggregate_rankings);
-        document.getElementById('stage3-output').innerHTML = renderStageCard(artifact.stage3_synthesis.model_id, artifact.stage3_synthesis.response, artifact.stage3_synthesis);
-      }
-
-      function renderStageCard(model, text, item, extra = '') {
-        const failed = item.status === 'error';
-        const body = failed
-          ? `<pre>${escapeHtml(item.error_type)}: ${escapeHtml(item.error_message)}</pre>`
-          : `<pre>${escapeHtml(text)}</pre>`;
-        return `
-          <div class="card ${failed ? 'error-panel' : ''}">
-            <h3>${escapeHtml(model)}</h3>
-            <div>${statusPill(item.status)} <span class="subtle">${escapeHtml(item.latency_ms)} ms</span></div>
-            ${body}
-            ${extra}
-          </div>
-        `;
-      }
-
-      function renderAggregate(items) {
-        if (!items || !items.length) return '<div class="subtle">No aggregate rankings.</div>';
-        return `
-          <table>
-            <thead><tr><th>Model</th><th>Average Rank</th><th>Count</th><th>Valid</th></tr></thead>
-            <tbody>
-              ${items.map((item) => `
-                <tr>
-                  <td>${escapeHtml(item.model_id)}</td>
-                  <td>${escapeHtml(item.average_rank)}</td>
-                  <td>${escapeHtml(item.rankings_count)}</td>
-                  <td>${escapeHtml(item.valid)}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        `;
-      }
-
-      function renderRagAnswer(result) {
-        const evidence = Array.isArray(result.evidence) ? result.evidence : [];
-        return `
-          ${result.warning ? `<div class="notice">${escapeHtml(result.warning)}</div>` : ''}
-          <div>${statusPill(result.status || 'UNKNOWN')}</div>
-          ${result.model ? `<div class="subtle">Model: ${escapeHtml(result.model)}</div>` : ''}
-          <pre>${escapeHtml(result.answer || '')}</pre>
-          ${evidence.length ? `
-            <div class="grid">
-              ${evidence.map((item) => `
-                <div class="card">
-                  <h3>${escapeHtml(item.source || item.doc_id || 'source')}</h3>
-                  <div class="subtle">Score: ${escapeHtml(item.score ?? 'n/a')}</div>
-                  <pre>${escapeHtml(item.snippet || '')}</pre>
-                </div>
-              `).join('')}
-            </div>
-          ` : '<div class="subtle">No evidence returned.</div>'}
-        `;
-      }
-
-      document.getElementById('run-form').addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const button = document.getElementById('run-button');
-        const message = document.getElementById('run-message');
-        button.disabled = true;
-        message.textContent = 'Running experiment...';
-        try {
-          const result = await api.createExperiment({
-            mode: document.getElementById('mode').value,
-            input: document.getElementById('prompt').value,
-            stage1_models: csv(document.getElementById('stage1').value),
-            stage2_reviewers: csv(document.getElementById('stage2').value),
-            chairman: document.getElementById('chairman').value.trim(),
-          });
-          message.textContent = `Artifact written: ${result.experiment_id} (${result.status})`;
-          await loadArtifact(result.experiment_id);
-        } catch (error) {
-          message.textContent = `Error: ${error.message}`;
-        } finally {
-          button.disabled = false;
-        }
-      });
-
-      document.getElementById('refresh').addEventListener('click', refreshArtifacts);
-
-      function updateRagModelState() {
-        const model = document.getElementById('rag-model').value;
-        const isExternal = model.startsWith('external/');
-        document.getElementById('rag-external-warning').classList.toggle('hidden', !isExternal);
-        document.getElementById('rag-custom-model-wrap').classList.toggle('hidden', model !== 'external/custom');
-      }
-
-      document.getElementById('rag-model').addEventListener('change', updateRagModelState);
-      document.getElementById('rag-use-model').addEventListener('change', () => {
-        const enabled = document.getElementById('rag-use-model').checked;
-        document.getElementById('rag-experimental-label').classList.toggle('hidden', !enabled);
-      });
-      document.getElementById('rag-form').addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const model = document.getElementById('rag-model').value;
-        const message = document.getElementById('rag-message');
-        const output = document.getElementById('rag-output');
-        const useModel = document.getElementById('rag-use-model').checked;
-        if (model.startsWith('external/')) {
-          message.textContent = 'External providers are not enabled in this HARDENING step.';
-          output.innerHTML = '';
-          return;
-        }
-
-        const button = document.getElementById('rag-run-button');
-        button.disabled = true;
-        message.textContent = 'Running RAG...';
-        output.innerHTML = '';
-        try {
-          const payload = {
-            query: document.getElementById('rag-query').value,
-            top_k: 5,
-            model,
-          };
-          const result = useModel
-            ? await api.modelAnswerRag(payload)
-            : await api.answerRag(payload);
-          message.textContent = 'RAG answer ready.';
-          output.innerHTML = renderRagAnswer(result);
-        } catch (error) {
-          message.textContent = `Error: ${error.message}`;
-          output.innerHTML = `<div class="card error-panel">${escapeHtml(error.message)}</div>`;
-        } finally {
-          button.disabled = false;
-        }
-      });
-      updateRagModelState();
-
-      refreshArtifacts().catch((error) => {
-        document.getElementById('artifact-list').innerHTML = `<div class="card error-panel">${escapeHtml(error.message)}</div>`;
-      });
-    </script>
+    <script src="./agent_console.js"></script>
   </body>
 </html>

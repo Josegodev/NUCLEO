@@ -13,7 +13,13 @@ from app.schemas.artifacts import (
 
 
 PlanStatus = Literal["planned", "no_plan"]
-PlanSource = Literal["explicit_request", "rule:disk_info", "rule:system_info", "rule_table"]
+PlanSource = Literal[
+    "explicit_request",
+    "rule:disk_info",
+    "rule:system_info",
+    "rule_table",
+    "llm_assisted",
+]
 
 
 class PlanStep(BaseModel):
@@ -38,6 +44,7 @@ class PlannedAction(BaseModel):
     source: PlanSource
     preconditions: list[ToolPrecondition] = Field(default_factory=list)
     expected_output: dict[str, JsonValue] = Field(default_factory=dict)
+    metadata: dict[str, JsonValue] = Field(default_factory=dict)
     version: Literal["action.v1"] = "action.v1"
 
     @model_validator(mode="after")

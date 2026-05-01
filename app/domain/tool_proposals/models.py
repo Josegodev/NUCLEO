@@ -1,5 +1,16 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import Any
+
+
+@dataclass(frozen=True)
+class AgentActionProposal:
+    """Structured action proposal produced by Planner augmentation."""
+
+    intent: str
+    suggested_action: str
+    arguments: dict[str, Any]
+    confidence: float
 
 
 @dataclass(frozen=True)

@@ -245,8 +245,10 @@ class RuntimeTracingTests(unittest.TestCase):
         self.assertEqual(
             cors.kwargs["allow_origins"],
             [
+                "http://127.0.0.1:8765",
                 "http://127.0.0.1:8766",
                 "http://127.0.0.1:8767",
+                "http://localhost:8765",
                 "http://localhost:8766",
                 "http://localhost:8767",
             ],

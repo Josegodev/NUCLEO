@@ -4,7 +4,6 @@ import pytest
 from pydantic import ValidationError
 from app.domain.contracts.action_request import ActionRequest
 
-
 def test_valid_action_request():
     req = ActionRequest(
         tool_name="echo",

@@ -43,7 +43,7 @@ Limitaciones actuales:
 """
 
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, Protocol
 
 from app.schemas.execution import PlannedAction
 from app.schemas.requests import AgentRequest
@@ -53,6 +53,11 @@ from app.tools.registry import registry as default_registry
 
 PayloadBuilder = Callable[[AgentRequest], dict]
 Matcher = Callable[[str, AgentRequest], bool]
+
+
+class PlannerStrategy(Protocol):
+    def create_plan(self, request: AgentRequest) -> PlannedAction:
+        raise NotImplementedError
 
 
 @dataclass(frozen=True)
@@ -65,7 +70,7 @@ class PlannerRule:
     reason: str
 
 
-class Planner:
+class DeterministicPlannerStrategy:
     def __init__(
         self,
         tool_registry: ToolRegistry = default_registry,
@@ -156,8 +161,13 @@ class Planner:
     @staticmethod
     def _build_disk_payload(request: AgentRequest) -> dict:
         structured_payload = request.payload or {}
-        disk_path_from_text = Planner._extract_path_from_text(request.user_input or "")
-        return Planner._merge_disk_payload(structured_payload, disk_path_from_text)
+        disk_path_from_text = DeterministicPlannerStrategy._extract_path_from_text(
+            request.user_input or ""
+        )
+        return DeterministicPlannerStrategy._merge_disk_payload(
+            structured_payload,
+            disk_path_from_text,
+        )
 
     @staticmethod
     def _extract_path_from_text(user_input: str) -> str | None:
@@ -185,3 +195,38 @@ class Planner:
         if "path" not in merged_payload and path_from_text:
             merged_payload["path"] = path_from_text
         return merged_payload
+
+
+class Planner:
+    def __init__(
+        self,
+        tool_registry: ToolRegistry = default_registry,
+        rules: list[PlannerRule] | None = None,
+        strategy: PlannerStrategy | None = None,
+    ) -> None:
+        self._strategy = strategy or DeterministicPlannerStrategy(
+            tool_registry=tool_registry,
+            rules=rules,
+        )
+
+    def create_plan(self, request: AgentRequest) -> PlannedAction:
+        if not isinstance(request, AgentRequest):
+            raise TypeError("PlannerStrategy must receive AgentRequest")
+
+        plan = self._strategy.create_plan(request)
+        if not isinstance(plan, PlannedAction):
+            raise TypeError("PlannerStrategy must return PlannedAction")
+
+        return plan
+
+    @staticmethod
+    def _build_disk_payload(request: AgentRequest) -> dict:
+        return DeterministicPlannerStrategy._build_disk_payload(request)
+
+    @staticmethod
+    def _extract_path_from_text(user_input: str) -> str | None:
+        return DeterministicPlannerStrategy._extract_path_from_text(user_input)
+
+    @staticmethod
+    def _merge_disk_payload(payload: dict, path_from_text: str | None) -> dict:
+        return DeterministicPlannerStrategy._merge_disk_payload(payload, path_from_text)

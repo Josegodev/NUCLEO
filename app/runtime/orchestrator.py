@@ -46,12 +46,21 @@ from app.schemas.responses import (
     ExecutionStatus,
 )
 from app.runtime.planner import Planner
+from app.runtime.planner_augmentation import (
+    LLMAssistedPlannerStrategy,
+    ModelRouterProposalProvider,
+)
 from app.runtime.tracing import ExecutionStep, ExecutionTrace, InMemoryTracer, Tracer
 from app.tools.registry import registry
 from app.policies.engine import PolicyEngine
 from app.policies.models import PolicyDecision, PolicyDecisionValue
 
-planner = Planner()
+planner = Planner(
+    strategy=LLMAssistedPlannerStrategy(
+        enabled=True,
+        proposal_provider=ModelRouterProposalProvider(),
+    )
+)
 policy_engine = PolicyEngine(tool_registry=registry)
 tracer = InMemoryTracer()
 
@@ -237,6 +246,7 @@ class AgentRuntime:
                 "tool": tool_name,
                 "payload": tool_payload,
             }
+            result.update(plan.metadata)
             self._safe_record_step(
                 trace=trace,
                 phase="tool",

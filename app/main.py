@@ -21,13 +21,15 @@ app = FastAPI(
     version="0.1.0"
 )
 
-# Runtime Audit UI local-only CORS. This does not expose runtime decisions to
-# the frontend; it only lets the browser read the existing HTTP API responses.
+# Local browser UIs CORS. This does not expose runtime decisions to the
+# frontend; it only lets the browser read existing HTTP API responses.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "http://127.0.0.1:8765",
         "http://127.0.0.1:8766",
         "http://127.0.0.1:8767",
+        "http://localhost:8765",
         "http://localhost:8766",
         "http://localhost:8767",
     ],
