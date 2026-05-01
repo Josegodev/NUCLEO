@@ -48,3 +48,4 @@ outputs/
 
 # Zips
 *.zipvenv/
+venv/
