@@ -142,7 +142,7 @@ Campos como `provider` y `use_rag` no forman parte del contrato de este
 endpoint. `provider=openai` en la UI se traduce a `external/openai`, que el
 backend actual rechaza con `EXTERNAL_MODEL_NOT_ENABLED`.
 
-## Estados de respuesta RAG
+## Estados de respuesta RAG con modelo
 
 ### `MODEL_ANSWER_READY`
 
@@ -156,6 +156,41 @@ Significa que el backend:
 No significa que la respuesta sea una decision de runtime. Sigue siendo una
 respuesta experimental de LLM_LAB.
 
+### `NO_EVIDENCE`
+
+Significa que `rag_nucleo_docs/search.py` no recupero evidencia para la
+pregunta. En este caso el backend no llama a LM Studio.
+
+Respuesta esperada:
+
+```json
+{
+  "status": "NO_EVIDENCE",
+  "answer": "NO_EVIDENCE_FOR_ANSWER",
+  "evidence": [],
+  "fallback_used": false,
+  "fallback_reason": null
+}
+```
+
+### `MODEL_ERROR`
+
+Significa que habia evidencia, pero la llamada a LM Studio fallo o devolvio una
+respuesta no utilizable. El backend mantiene la evidencia recuperada y devuelve
+error controlado en JSON estable.
+
+Respuesta esperada:
+
+```json
+{
+  "status": "MODEL_ERROR",
+  "answer": "",
+  "evidence": ["..."],
+  "fallback_used": true,
+  "fallback_reason": "connection_error: LM Studio is not reachable"
+}
+```
+
 ### `NO_EVIDENCE_FOR_ANSWER`
 
 `NO_EVIDENCE_FOR_ANSWER` no es un `status` estructurado del endpoint. Es el
@@ -165,15 +200,32 @@ contiene suficiente informacion para responder.
 Puede ocurrir incluso si `evidence` tiene elementos, porque la politica del
 prompt es estricta: el modelo debe responder solo con evidencia y no inventar.
 
-Si no se recupera ninguna evidencia, el backend puede responder con:
+Regla enviada al modelo:
 
-```json
-{
-  "status": "EVIDENCE_NOT_FOUND",
-  "answer": "",
-  "evidence": []
-}
+```text
+Responde SOLO usando la evidencia proporcionada. Si la evidencia no contiene la respuesta, responde NO_EVIDENCE_FOR_ANSWER.
 ```
+
+## Prueba manual de `/rag/model-answer`
+
+Con LM Studio apagado, si hay evidencia, debe devolver `MODEL_ERROR` controlado:
+
+```bash
+curl -i -X POST http://127.0.0.1:8765/rag/model-answer \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"Que hace el Planner?","top_k":5,"model":"qwen"}'
+```
+
+Para verificar que no llama al modelo sin evidencia:
+
+```bash
+curl -i -X POST http://127.0.0.1:8765/rag/model-answer \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"zzzz_no_deberia_tener_evidencia_12345","top_k":5,"model":"qwen"}'
+```
+
+Con LM Studio encendido en su API OpenAI-compatible local, el mismo endpoint
+debe devolver `MODEL_ANSWER_READY` cuando el modelo cargado responda.
 
 ## Criterio de aceptacion
 

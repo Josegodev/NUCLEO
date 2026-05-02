@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import sys
+from collections.abc import Mapping
+from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Literal
 
@@ -27,8 +29,10 @@ if str(LLM_LAB_DIR) not in sys.path:
 
 from experiment_runner import default_config, run_experiment  # noqa: E402
 from experiment_validator import ArtifactValidationError, validate_artifact  # noqa: E402
-from model_adapter import OLLAMA_MODEL_ALIASES, call_model  # noqa: E402
+from llm_rag_answer import NO_EVIDENCE_FOR_ANSWER, build_grounded_rag_prompt  # noqa: E402
+from model_adapter import OLLAMA_MODEL_ALIASES  # noqa: E402
 from rag_nucleo_docs.rag_answer import build_answer  # noqa: E402
+from rag_nucleo_docs.lmstudio_adapter import call_lmstudio_model  # noqa: E402
 from rag_nucleo_docs.search import search as rag_search  # noqa: E402
 
 
@@ -256,25 +260,36 @@ async def answer_rag_with_model(request: RagModelAnswerRequest) -> dict[str, obj
     try:
         model = _validate_rag_model(request.model, required=True)
         retrieval = rag_search(request.query, top_k=request.top_k)
-        evidence = _build_model_answer_evidence(retrieval)
+        evidence = _normalize_model_answer_evidence(retrieval)
         if not evidence:
             return {
-                "status": "EVIDENCE_NOT_FOUND",
+                "status": "NO_EVIDENCE",
                 "query": request.query,
                 "model": model,
-                "answer": "",
+                "answer": NO_EVIDENCE_FOR_ANSWER,
                 "evidence": [],
+                "fallback_used": False,
+                "fallback_reason": None,
+                "warning": RAG_MODEL_ANSWER_WARNING,
             }
 
-        prompt = _build_model_answer_prompt(request.query, evidence)
-        result = call_model(
+        prompt = build_grounded_rag_prompt(request.query, evidence)
+        result = call_lmstudio_model(
             model,
             prompt,
-            mode="ollama",
             timeout_ms=RAG_MODEL_ANSWER_TIMEOUT_MS,
         )
         if result.status != "success":
-            raise HTTPException(status_code=502, detail="MODEL_CALL_FAILED")
+            return {
+                "status": "MODEL_ERROR",
+                "query": request.query,
+                "model": model,
+                "answer": "",
+                "evidence": evidence,
+                "fallback_used": True,
+                "fallback_reason": _summarize_model_error(result),
+                "warning": RAG_MODEL_ANSWER_WARNING,
+            }
 
         return {
             "status": "MODEL_ANSWER_READY",
@@ -282,6 +297,8 @@ async def answer_rag_with_model(request: RagModelAnswerRequest) -> dict[str, obj
             "model": model,
             "answer": result.output or "",
             "evidence": evidence,
+            "fallback_used": False,
+            "fallback_reason": None,
             "warning": RAG_MODEL_ANSWER_WARNING,
         }
     except HTTPException:
@@ -325,54 +342,58 @@ def _validate_rag_model(model: str | None, *, required: bool = False) -> str | N
     return model
 
 
-def _build_model_answer_evidence(retrieval: dict[str, object]) -> list[dict[str, object]]:
+def _normalize_model_answer_evidence(retrieval: object) -> list[dict[str, object]]:
+    if not isinstance(retrieval, Mapping):
+        return []
+
     raw_results = retrieval.get("results", [])
     if not isinstance(raw_results, list):
         return []
 
     evidence: list[dict[str, object]] = []
     for result in raw_results:
-        if not isinstance(result, dict):
+        result_map = _object_to_mapping(result)
+        if result_map is None:
             continue
-        snippet = str(result.get("snippet", "")).strip()
+        snippet = str(result_map.get("snippet") or result_map.get("text") or "").strip()
         if not snippet:
             continue
-        doc_id = result.get("doc_id")
-        source = result.get("file") or doc_id
+        doc_id = result_map.get("doc_id") or result_map.get("chunk_id")
+        source = result_map.get("source") or result_map.get("file") or doc_id
         evidence.append(
             {
                 "doc_id": doc_id,
+                "chunk_id": result_map.get("chunk_id") or doc_id,
                 "source": source,
-                "score": result.get("score"),
+                "score": result_map.get("score"),
+                "heading": result_map.get("heading"),
+                "start_line": result_map.get("start_line"),
+                "end_line": result_map.get("end_line"),
                 "snippet": snippet,
             }
         )
     return evidence
 
 
-def _build_model_answer_prompt(query: str, evidence: list[dict[str, object]]) -> str:
-    evidence_blocks = []
-    for index, item in enumerate(evidence, start=1):
-        evidence_blocks.append(
-            "\n".join(
-                [
-                    f"[{index}] source: {item.get('source') or item.get('doc_id') or 'unknown'}",
-                    f"snippet: {item.get('snippet') or ''}",
-                ]
-            )
-        )
-    return (
-        "Responde usando exclusivamente la evidencia proporcionada.\n"
-        "Si la evidencia no contiene la respuesta, responde exactamente:\n"
-        "NO_EVIDENCE_FOR_ANSWER.\n"
-        "No añadas ejemplos externos.\n"
-        "No generalices.\n"
-        "No inventes.\n"
-        "Pregunta:\n"
-        f"{query}\n\n"
-        "Evidencia:\n"
-        + "\n".join(evidence_blocks)
-    )
+def _object_to_mapping(value: object) -> dict[str, object] | None:
+    if isinstance(value, Mapping):
+        return dict(value)
+    if is_dataclass(value) and not isinstance(value, type):
+        return asdict(value)
+    if hasattr(value, "model_dump"):
+        dumped = value.model_dump()
+        return dict(dumped) if isinstance(dumped, Mapping) else None
+    return None
+
+
+def _summarize_model_error(result: object) -> str:
+    error_type = getattr(result, "error_type", None)
+    error_message = getattr(result, "error_message", None)
+    if error_type and error_message:
+        return f"{error_type}: {error_message}"
+    if error_message:
+        return str(error_message)
+    return "LM Studio model call failed"
 
 
 def _validate_experiment_id(experiment_id: str) -> None:

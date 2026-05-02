@@ -19,6 +19,46 @@ from runtime_lab.llm_lab.rag_nucleo_docs.evidence import (
 )
 
 
+NO_EVIDENCE_FOR_ANSWER = "NO_EVIDENCE_FOR_ANSWER"
+RAG_GROUNDING_RULE = (
+    "Responde SOLO usando la evidencia proporcionada. "
+    "Si la evidencia no contiene la respuesta, responde NO_EVIDENCE_FOR_ANSWER."
+)
+
+
+def build_grounded_rag_prompt(query: str, evidence: list[dict[str, Any]]) -> str:
+    """Build the shared LAB-only prompt for model answers over RAG evidence."""
+    evidence_blocks = []
+    for index, item in enumerate(evidence, start=1):
+        source = item.get("source") or item.get("file") or item.get("doc_id") or "unknown"
+        snippet = str(item.get("snippet", "")).strip()
+        evidence_blocks.append(
+            "\n".join(
+                [
+                    f"[{index}] source: {source}",
+                    f"snippet: {snippet}",
+                ]
+            )
+        )
+
+    return "\n".join(
+        [
+            RAG_GROUNDING_RULE,
+            "No busques documentos.",
+            "No leas ficheros.",
+            "No ejecutes tools.",
+            "No decidas politicas.",
+            "No accedas a ToolRegistry.",
+            "",
+            "Pregunta:",
+            query,
+            "",
+            "Evidencia:",
+            "\n\n".join(evidence_blocks),
+        ]
+    )
+
+
 def build_llm_rag_answer(
     query: str,
     model_id: str,
@@ -34,21 +74,7 @@ def build_llm_rag_answer(
     if status == NO_EVIDENCE:
         answer = "NO_CONSTA_EN_DOCUMENTACION"
     elif status == EVIDENCE_FOUND:
-        # Build prompt from snippets
-        snippets = [
-            str(item.get("snippet", "")).strip()
-            for item in evidence
-            if isinstance(item, dict) and str(item.get("snippet", "")).strip()
-        ]
-        prompt = f"""Responde la pregunta basada únicamente en los siguientes snippets de documentación:
-
-{"\n\n".join(snippets)}
-
-Pregunta: {query}
-
-Respuesta:"""
-
-        # Call the model
+        prompt = build_grounded_rag_prompt(query, evidence)
         model_call = call_model(model_id, prompt, mode=mode, timeout_ms=timeout_ms)
         if model_call.status == "success":
             answer = model_call.output
