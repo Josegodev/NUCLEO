@@ -45,6 +45,10 @@ Limitaciones actuales:
 from dataclasses import dataclass
 from typing import Callable, Protocol
 
+from app.runtime.augmentation_service import (
+    AugmentationResult,
+    build_augmentation_metadata,
+)
 from app.schemas.execution import PlannedAction
 from app.schemas.requests import AgentRequest
 from app.tools.registry import ToolRegistry
@@ -209,15 +213,73 @@ class Planner:
             rules=rules,
         )
 
-    def create_plan(self, request: AgentRequest) -> PlannedAction:
+    def create_plan(
+        self,
+        request: AgentRequest,
+        augmentation_result: AugmentationResult | None = None,
+    ) -> PlannedAction:
         if not isinstance(request, AgentRequest):
             raise TypeError("PlannerStrategy must receive AgentRequest")
+
+        if augmentation_result is not None:
+            plan = self._create_plan_from_augmentation(request, augmentation_result)
+            if not isinstance(plan, PlannedAction):
+                raise TypeError("PlannerStrategy must return PlannedAction")
+            return plan
 
         plan = self._strategy.create_plan(request)
         if not isinstance(plan, PlannedAction):
             raise TypeError("PlannerStrategy must return PlannedAction")
 
         return plan
+
+    def _create_plan_from_augmentation(
+        self,
+        request: AgentRequest,
+        augmentation_result: AugmentationResult,
+    ) -> PlannedAction:
+        if not isinstance(augmentation_result, AugmentationResult):
+            raise TypeError("augmentation_result must be AugmentationResult")
+
+        if augmentation_result.fallback_used:
+            plan = self._strategy.create_plan(request)
+            metadata = build_augmentation_metadata(
+                augmentation_result,
+                request=request,
+                fallback_plan=plan,
+            )
+            return plan.model_copy(update={"metadata": metadata})
+
+        metadata = build_augmentation_metadata(
+            augmentation_result,
+            request=request,
+        )
+        proposed_action = augmentation_result.proposed_action
+        if proposed_action is None:
+            return PlannedAction(
+                payload={},
+                status="no_plan",
+                confidence=0.0,
+                reason=(
+                    "LLM-assisted proposal returned no action: "
+                    f"{augmentation_result.assistant_message}"
+                ),
+                source="llm_assisted",
+                metadata=metadata,
+            )
+
+        return PlannedAction(
+            tool_name=proposed_action.tool_name,
+            payload=proposed_action.arguments,
+            status="planned",
+            confidence=proposed_action.confidence,
+            reason=(
+                "LLM-assisted proposal accepted: "
+                f"{augmentation_result.assistant_message}"
+            ),
+            source="llm_assisted",
+            metadata=metadata,
+        )
 
     @staticmethod
     def _build_disk_payload(request: AgentRequest) -> dict:

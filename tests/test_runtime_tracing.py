@@ -245,19 +245,14 @@ class RuntimeTracingTests(unittest.TestCase):
         self.assertEqual(
             cors.kwargs["allow_origins"],
             [
-                "http://127.0.0.1:8765",
-                "http://127.0.0.1:8766",
                 "http://127.0.0.1:8767",
-                "http://localhost:8765",
-                "http://localhost:8766",
                 "http://localhost:8767",
+                "http://127.0.0.1:8080",
+                "http://localhost:8080",
             ],
         )
-        self.assertEqual(cors.kwargs["allow_methods"], ["GET", "POST", "OPTIONS"])
-        self.assertEqual(
-            cors.kwargs["allow_headers"],
-            ["Authorization", "Content-Type", "X-Idempotency-Key"],
-        )
+        self.assertEqual(cors.kwargs["allow_methods"], ["*"])
+        self.assertEqual(cors.kwargs["allow_headers"], ["*"])
 
     def test_policy_denies_registered_tool_not_in_explicit_allowlist(self) -> None:
         decision = PolicyEngine(tool_registry=StaticRegistry(SpyTool(name="spy"))).evaluate(

@@ -26,16 +26,14 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://127.0.0.1:8765",
-        "http://127.0.0.1:8766",
         "http://127.0.0.1:8767",
-        "http://localhost:8765",
-        "http://localhost:8766",
         "http://localhost:8767",
+        "http://127.0.0.1:8080",
+        "http://localhost:8080",
     ],
     allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Idempotency-Key"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(health.router)

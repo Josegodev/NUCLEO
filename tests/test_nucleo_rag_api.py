@@ -145,6 +145,113 @@ class NucleoRagApiTests(unittest.TestCase):
             [{"text": "dry_run evidence", "source": "README.md", "score": 0.5}],
         )
 
+    def test_continue_context_returns_context_items_from_evidence(self) -> None:
+        def fake_search(question: str, top_k: int = 5) -> dict[str, Any]:
+            self.assertEqual(question, "dry_run")
+            self.assertEqual(top_k, 2)
+            return {
+                "question": question,
+                "status": "FOUND",
+                "results": [
+                    {
+                        "snippet": "dry_run evidence",
+                        "file": str(api.REPO_ROOT / "README.md"),
+                        "score": 0.5,
+                    }
+                ],
+            }
+
+        api.rag_search = fake_search
+
+        with self.assertLogs(api.logger, level="INFO") as logs:
+            status_code, payload = asgi_request(
+                "POST",
+                "/nucleo-rag/context",
+                {
+                    "query": " dry_run ",
+                    "fullInput": "@nucleo-rag dry_run",
+                    "options": {"top_k": 2},
+                },
+            )
+
+        self.assertEqual(status_code, 200)
+        self.assertEqual(len(payload), 1)
+        self.assertEqual(payload[0]["name"], "nucleo-rag:1:README.md")
+        self.assertIn("README.md", payload[0]["description"])
+        self.assertIn("source: README.md", payload[0]["content"])
+        self.assertIn("dry_run evidence", payload[0]["content"])
+        self.assertIn("result_count=1", logs.output[0])
+        self.assertIn("fallback_reason=None", logs.output[0])
+
+    def test_continue_context_returns_empty_list_when_no_evidence(self) -> None:
+        def fake_search(question: str, top_k: int = 5) -> dict[str, Any]:
+            self.assertEqual(question, "pregunta sin evidencia")
+            return {
+                "question": question,
+                "status": "NO_CONSTA_EN_DOCUMENTACION",
+                "results": [],
+            }
+
+        api.rag_search = fake_search
+
+        with self.assertLogs(api.logger, level="INFO") as logs:
+            status_code, payload = asgi_request(
+                "POST",
+                "/nucleo-rag/context",
+                {"query": "pregunta sin evidencia"},
+            )
+
+        self.assertEqual(status_code, 200)
+        self.assertEqual(payload, [])
+        self.assertIn("result_count=0", logs.output[0])
+        self.assertIn("fallback_reason=NO_EVIDENCE", logs.output[0])
+
+    def test_continue_context_falls_back_to_full_input_query(self) -> None:
+        def fake_search(question: str, top_k: int = 5) -> dict[str, Any]:
+            self.assertEqual(question, "@nucleo-rag dry_run")
+            self.assertEqual(top_k, api.DEFAULT_CONTEXT_TOP_K)
+            return {
+                "question": question,
+                "status": "FOUND",
+                "results": [
+                    {
+                        "snippet": "fallback query evidence",
+                        "file": "runtime_lab/llm_lab/README.md",
+                        "score": 1,
+                    }
+                ],
+            }
+
+        api.rag_search = fake_search
+
+        status_code, payload = asgi_request(
+            "POST",
+            "/nucleo-rag/context",
+            {"query": " ", "fullInput": "@nucleo-rag dry_run"},
+        )
+
+        self.assertEqual(status_code, 200)
+        self.assertEqual(len(payload), 1)
+        self.assertIn("fallback query evidence", payload[0]["content"])
+
+    def test_continue_context_rejects_invalid_options_as_empty_context(self) -> None:
+        def fail_if_called(question: str, top_k: int = 5) -> dict[str, Any]:
+            raise AssertionError("RAG must not be called for invalid options")
+
+        api.rag_search = fail_if_called
+
+        with self.assertLogs(api.logger, level="INFO") as logs:
+            status_code, payload = asgi_request(
+                "POST",
+                "/nucleo-rag/context",
+                {"query": "dry_run", "options": ["top_k", 2]},
+            )
+
+        self.assertEqual(status_code, 200)
+        self.assertEqual(payload, [])
+        self.assertIn("result_count=0", logs.output[0])
+        self.assertIn("fallback_reason=INVALID_OPTIONS", logs.output[0])
+
 
 if __name__ == "__main__":
     unittest.main()

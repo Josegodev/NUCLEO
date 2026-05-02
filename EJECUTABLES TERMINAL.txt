@@ -1,0 +1,17 @@
+LEVANTAR SERVICIO
+
+RAG
+cd /home/jose-gonzalez-oliva/NUCLEO
+source .venv/bin/activate
+uvicorn runtime_lab.llm_lab.nucleo_rag_api:app --reload --port 9000
+
+
+NUCLEO
+source .venv/bin/activate
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8001
+
+
+LEVANTAR WEB
+python3 -m http.server 8766 --directory runtime_lab/llm_lab_ui/frontend
+
+

@@ -1,0 +1,10 @@
+LEVANTAR SERVICIO
+
+source .venv/bin/activate
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8001
+
+LEVANTAR WEB
+
+python3 -m http.server 8766 --directory runtime_lab/llm_lab_ui/frontend
+
+

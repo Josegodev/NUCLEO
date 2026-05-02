@@ -53,6 +53,65 @@ Primero levantar el endpoint RAG:
 uvicorn runtime_lab.llm_lab.nucleo_rag_api:app --reload --port 9000
 ```
 
+### HTTP Context Provider para Continue
+
+El endpoint lab-only compatible con Continue es:
+
+```text
+POST http://127.0.0.1:9000/nucleo-rag/context
+```
+
+Este endpoint recibe el body que envia Continue al provider HTTP:
+
+```json
+{
+  "query": "pregunta del usuario",
+  "fullInput": "@nucleo-rag pregunta del usuario"
+}
+```
+
+La respuesta es una lista de items de contexto:
+
+```json
+[
+  {
+    "name": "nucleo-rag:1:README.md",
+    "description": "NUCLEO RAG evidence from README.md; score=0.5",
+    "content": "source: README.md\nscore: 0.5\n\n..."
+  }
+]
+```
+
+Si no hay evidencia suficiente, devuelve `[]`. El endpoint registra en logs:
+
+- `input`
+- `result_count`
+- `fallback_reason`
+
+Configurar `~/.continue/config.yaml`:
+
+```yaml
+name: local-nucleo
+version: 1.0.0
+schema: v1
+
+context:
+  - provider: http
+    name: nucleo-rag
+    params:
+      url: "http://127.0.0.1:9000/nucleo-rag/context"
+```
+
+Uso esperado en Continue:
+
+```text
+@nucleo-rag que hace dry_run
+```
+
+Continue usa `@nucleo-rag` solo como fuente de evidencia. Este endpoint no
+convierte Continue en runtime de NUCLEO, no decide politicas, no registra tools
+y no ejecuta tools.
+
 Uso desde CLI:
 
 ```bash

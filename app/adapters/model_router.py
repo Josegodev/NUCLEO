@@ -14,24 +14,24 @@ from dataclasses import dataclass
 import requests
 
 from app.schemas.artifacts import JsonValue
-from app.schemas.requests import AgentBackend
+from app.schemas.requests import (
+    ALLOWED_AUGMENTATION_MODELS,
+    DEFAULT_AUGMENTATION_MODEL_ID,
+    AgentBackend,
+    resolve_augmentation_model_id,
+)
 from runtime_lab.llm_lab.model_adapter import call_model
 
 
-DEFAULT_LOCAL_MODEL_ID = "llama3.1:8b"
+DEFAULT_LOCAL_MODEL_ID = DEFAULT_AUGMENTATION_MODEL_ID
 DEFAULT_OPENAI_MODEL_ID = "gpt-4o-mini"
 DEFAULT_TIMEOUT_MS = 120000
 OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions"
 OPENAI_API_KEY_ENV = "OPENAI_API_KEY"
 OPENAI_FALLBACK_MODEL_ENV = "NUCLEO_OPENAI_FALLBACK_MODEL"
-LOCAL_MODEL_IDS = {
-    "qwen",
-    "qwen2.5-coder:7b",
-    "mistral",
-    "mistral:latest",
-    "llama3.1",
-    "llama3.1:8b",
-}
+ALLOWED_MODELS = ALLOWED_AUGMENTATION_MODELS
+ALLOWED_OPENAI_MODELS = {DEFAULT_OPENAI_MODEL_ID}
+LOCAL_MODEL_IDS = ALLOWED_MODELS
 
 
 @dataclass(frozen=True)
@@ -66,24 +66,46 @@ class ModelRouter:
         model_id: str | None,
     ) -> dict[str, JsonValue]:
         selected_backend = AgentBackend(backend)
-        selected_model = (model_id or DEFAULT_LOCAL_MODEL_ID).strip()
-        if not selected_model:
-            selected_model = DEFAULT_LOCAL_MODEL_ID
+        selected_model, model_resolution_reason = self._resolve_model_id(
+            model_id,
+            selected_backend,
+        )
         start = time.perf_counter()
 
         if selected_backend == AgentBackend.LOCAL:
             result = self._local_caller(selected_model, prompt)
-            return self._to_router_result(result, start=start)
+            return self._to_router_result(
+                result,
+                start=start,
+                fallback_used=model_resolution_reason is not None,
+                fallback_reason=model_resolution_reason,
+                model_resolution_reason=model_resolution_reason,
+            )
 
         if selected_backend == AgentBackend.OPENAI:
             result = self._openai_caller(selected_model, prompt)
-            return self._to_router_result(result, start=start)
+            return self._to_router_result(
+                result,
+                start=start,
+                fallback_used=model_resolution_reason is not None,
+                fallback_reason=model_resolution_reason,
+                model_resolution_reason=model_resolution_reason,
+            )
 
         local_result = self._local_caller(selected_model, prompt)
         if local_result.success:
-            return self._to_router_result(local_result, start=start)
+            return self._to_router_result(
+                local_result,
+                start=start,
+                fallback_used=model_resolution_reason is not None,
+                fallback_reason=model_resolution_reason,
+                model_resolution_reason=model_resolution_reason,
+            )
 
-        fallback_reason = self._failure_reason(local_result)
+        fallback_reason = self._combine_reasons(
+            model_resolution_reason,
+            self._failure_reason(local_result),
+        )
         openai_model = self._openai_fallback_model(selected_model)
         openai_result = self._openai_caller(openai_model, prompt)
         if openai_result.success:
@@ -92,13 +114,18 @@ class ModelRouter:
                 start=start,
                 fallback_used=True,
                 fallback_reason=fallback_reason,
+                model_resolution_reason=model_resolution_reason,
             )
 
         return self._to_router_result(
             openai_result,
             start=start,
             fallback_used=True,
-            fallback_reason=f"{fallback_reason}; {self._failure_reason(openai_result)}",
+            fallback_reason=self._combine_reasons(
+                fallback_reason,
+                self._failure_reason(openai_result),
+            ),
+            model_resolution_reason=model_resolution_reason,
         )
 
     def _call_local(self, model_id: str, prompt: str) -> ModelBackendCall:
@@ -237,6 +264,7 @@ class ModelRouter:
         start: float,
         fallback_used: bool = False,
         fallback_reason: str | None = None,
+        model_resolution_reason: str | None = None,
     ) -> dict[str, JsonValue]:
         return {
             "output": result.output or "",
@@ -245,6 +273,7 @@ class ModelRouter:
             "latency_ms": round((time.perf_counter() - start) * 1000, 3),
             "fallback_used": fallback_used,
             "fallback_reason": fallback_reason or result.error_message,
+            "model_resolution_reason": model_resolution_reason,
         }
 
     @staticmethod
@@ -257,3 +286,21 @@ class ModelRouter:
     @staticmethod
     def _elapsed_ms(start: float) -> float:
         return round((time.perf_counter() - start) * 1000, 3)
+
+    @staticmethod
+    def _resolve_model_id(
+        model_id: str | None,
+        backend: AgentBackend,
+    ) -> tuple[str, str | None]:
+        requested_model = (model_id or "").strip()
+        if backend == AgentBackend.OPENAI and requested_model in ALLOWED_OPENAI_MODELS:
+            return requested_model, None
+
+        return resolve_augmentation_model_id(model_id)
+
+    @staticmethod
+    def _combine_reasons(*reasons: str | None) -> str | None:
+        filtered_reasons = [reason for reason in reasons if reason]
+        if not filtered_reasons:
+            return None
+        return "; ".join(filtered_reasons)

@@ -7,6 +7,7 @@ NUCLEO runtime components, policies, registries, or tools.
 
 from __future__ import annotations
 
+import logging
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,8 @@ from runtime_lab.llm_lab.rag_nucleo_docs.search import search as rag_search
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_CONTEXT_TOP_K = 5
+logger = logging.getLogger(__name__)
 
 
 class RagStatus(str, Enum):
@@ -51,6 +54,18 @@ class RagQueryResponse(BaseModel):
     status: RagStatus
     evidence: list[EvidenceItem] = Field(default_factory=list)
     error: str | None = None
+
+
+class ContinueContextRequest(BaseModel):
+    query: Any = None
+    fullInput: Any = None
+    options: Any = None
+
+
+class ContinueContextItem(BaseModel):
+    name: str
+    description: str
+    content: str
 
 
 app = FastAPI(title="NUCLEO RAG Evidence API")
@@ -88,6 +103,53 @@ async def query_rag(request: RagQueryRequest) -> RagQueryResponse | JSONResponse
 
     status = RagStatus.EVIDENCE_FOUND if evidence else RagStatus.EVIDENCE_NOT_FOUND
     return RagQueryResponse(status=status, evidence=evidence, error=None)
+
+
+@app.post("/nucleo-rag/context", response_model=list[ContinueContextItem])
+async def continue_rag_context(
+    request: ContinueContextRequest,
+) -> list[ContinueContextItem]:
+    query = _continue_query(request)
+    options = _continue_options(request.options)
+    top_k = _continue_top_k(options) if options is not None else None
+    fallback_reason: str | None = None
+    items: list[ContinueContextItem] = []
+
+    if query is None:
+        fallback_reason = "INVALID_QUERY"
+    elif options is None:
+        fallback_reason = "INVALID_OPTIONS"
+    elif top_k is None:
+        fallback_reason = "INVALID_TOP_K"
+    else:
+        try:
+            evidence = _retrieve_evidence(query, top_k)
+            if evidence is None:
+                fallback_reason = "RAG_INVALID_RESPONSE"
+            elif not evidence:
+                fallback_reason = "NO_EVIDENCE"
+            else:
+                items = _continue_items(evidence)
+        except FileNotFoundError:
+            fallback_reason = "RAG_INDEX_NOT_FOUND"
+        except ValueError as exc:
+            fallback_reason = str(exc) or "RAG_QUERY_FAILED"
+        except Exception:
+            fallback_reason = "RAG_QUERY_FAILED"
+
+    _log_continue_context(
+        input_value=query or "",
+        result_count=len(items),
+        fallback_reason=fallback_reason,
+    )
+    return items
+
+
+def _retrieve_evidence(query: str, top_k: int) -> list[EvidenceItem] | None:
+    retrieval = rag_search(query, top_k=top_k)
+    if not isinstance(retrieval, dict):
+        return None
+    return _normalize_evidence(retrieval.get("results", []))
 
 
 def _normalize_evidence(results: Any) -> list[EvidenceItem]:
@@ -133,6 +195,72 @@ def _safe_score(value: Any) -> float:
         return float(value)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _continue_query(request: ContinueContextRequest) -> str | None:
+    query = _clean_text(request.query)
+    if query is not None:
+        return query
+    return _clean_text(request.fullInput)
+
+
+def _clean_text(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip()
+    return cleaned or None
+
+
+def _continue_options(value: Any) -> dict[str, Any] | None:
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return value
+    return None
+
+
+def _continue_top_k(options: dict[str, Any]) -> int | None:
+    raw_value = options.get("top_k", DEFAULT_CONTEXT_TOP_K)
+    if isinstance(raw_value, bool) or not isinstance(raw_value, int):
+        return None
+    if 1 <= raw_value <= 10:
+        return raw_value
+    return None
+
+
+def _continue_items(evidence: list[EvidenceItem]) -> list[ContinueContextItem]:
+    items: list[ContinueContextItem] = []
+    for index, item in enumerate(evidence, start=1):
+        items.append(
+            ContinueContextItem(
+                name=f"nucleo-rag:{index}:{item.source}",
+                description=(
+                    f"NUCLEO RAG evidence from {item.source}; score={item.score}"
+                ),
+                content="\n".join(
+                    [
+                        f"source: {item.source}",
+                        f"score: {item.score}",
+                        "",
+                        item.text,
+                    ]
+                ),
+            )
+        )
+    return items
+
+
+def _log_continue_context(
+    input_value: str,
+    result_count: int,
+    fallback_reason: str | None,
+) -> None:
+    logger.info(
+        "continue_rag_context input=%r result_count=%s fallback_reason=%s",
+        input_value,
+        result_count,
+        fallback_reason,
+    )
 
 
 def _error_response(error: str, status_code: int) -> JSONResponse:

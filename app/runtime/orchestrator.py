@@ -46,25 +46,20 @@ from app.schemas.responses import (
     ExecutionErrorCode,
     ExecutionStatus,
 )
-from app.runtime.planner import Planner
-from app.runtime.planner_augmentation import (
-    LLMAssistedPlannerStrategy,
-    LLMPlanOutputValidator,
-    ModelRouterProposalProvider,
+from app.runtime.augmentation_service import (
+    AugmentationResult,
+    AugmentationService,
+    serialize_tool_catalog,
 )
+from app.runtime.planner import Planner
 from app.runtime.tracing import ExecutionStep, ExecutionTrace, InMemoryTracer, Tracer
 from app.tools.registry import registry
 from app.policies.engine import PolicyEngine
 from app.policies.models import PolicyDecision, PolicyDecisionValue
 from app.services.approval.approval_store import ApprovalStore
 
-planner = Planner(
-    strategy=LLMAssistedPlannerStrategy(
-        enabled=True,
-        proposal_provider=ModelRouterProposalProvider(tool_registry=registry),
-        validator=LLMPlanOutputValidator(tool_registry=registry),
-    )
-)
+planner = Planner()
+augmentation_service = AugmentationService()
 policy_engine = PolicyEngine(tool_registry=registry)
 tracer = InMemoryTracer()
 approval_store = ApprovalStore()
@@ -78,18 +73,26 @@ class AgentRuntime:
         tool_registry=registry,
         runtime_tracer: Tracer | None = None,
         runtime_approval_store: ApprovalStore | None = None,
+        runtime_augmentation_service: AugmentationService | None = None,
     ) -> None:
+        using_default_planner = runtime_planner is None
         self._planner = runtime_planner or planner
         self._policy_engine = runtime_policy_engine or policy_engine
         self._registry = tool_registry
         self._tracer = runtime_tracer or tracer
         self._approval_store = runtime_approval_store or approval_store
+        self._augmentation_service = (
+            runtime_augmentation_service
+            if runtime_augmentation_service is not None
+            else augmentation_service if using_default_planner else None
+        )
 
     def run(self, request: AgentRequest, context: ExecutionContext) -> AgentResponse:
         trace = self._safe_start_trace(context.request_id)
         trace_id = trace.trace_id
         try:
-            plan = self._planner.create_plan(request)
+            augmentation_result = self._run_augmentation(request, context)
+            plan = self._create_plan(request, augmentation_result)
             self._validate_planner_result(plan)
         except ValidationError as exc:
             self._safe_record_step(
@@ -534,6 +537,38 @@ class AgentRuntime:
         if not isinstance(plan, PlannedAction):
             raise TypeError("Planner must return PlannedAction")
 
+    def _run_augmentation(
+        self,
+        request: AgentRequest,
+        context: ExecutionContext,
+    ) -> AugmentationResult | None:
+        if not self._should_attempt_augmentation(request):
+            return None
+
+        if self._augmentation_service is None:
+            return None
+
+        tool_catalog = serialize_tool_catalog(self._registry)
+        return self._augmentation_service.run(
+            request=request,
+            context=context,
+            tool_catalog=tool_catalog,
+        )
+
+    def _create_plan(
+        self,
+        request: AgentRequest,
+        augmentation_result: AugmentationResult | None,
+    ) -> PlannedAction:
+        if augmentation_result is None:
+            return self._planner.create_plan(request)
+
+        create_plan = self._planner.create_plan
+        if "augmentation_result" not in create_plan.__annotations__:
+            return create_plan(request)
+
+        return create_plan(request, augmentation_result=augmentation_result)
+
     def _validate_policy_result(self, decision: PolicyDecision) -> None:
         if not isinstance(decision, PolicyDecision):
             raise TypeError("PolicyEngine must return PolicyDecision")
@@ -604,8 +639,15 @@ class AgentRuntime:
     def _should_persist_approval_proposal(request: AgentRequest) -> bool:
         return (
             request.options is not None
-            and request.options.agent_mode == AgentMode.PROPOSAL_ONLY
+            and request.agent_mode == AgentMode.PROPOSAL_ONLY
             and request.dry_run
+        )
+
+    @staticmethod
+    def _should_attempt_augmentation(request: AgentRequest) -> bool:
+        return (
+            request.options is not None
+            and request.agent_mode == AgentMode.PROPOSAL_ONLY
         )
 
     @staticmethod
