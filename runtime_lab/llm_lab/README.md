@@ -33,6 +33,46 @@ Reglas estrictas:
 - LLM no ejecuta tools ni modifica runtime.
 - Evidence siempre se devuelve intacta.
 
+## Continue RAG Adapter
+
+`continue_rag_adapter.py` prepara prompts para Continue, VS Code o un LLM local
+usando evidencia del endpoint HTTP local:
+
+```text
+http://127.0.0.1:9000/nucleo-rag/query
+```
+
+Este adapter no forma parte del runtime principal de NUCLEO. No importa
+`app/`, no llama a `AgentRuntime`, `Planner`, `PolicyEngine` ni
+`ToolRegistry`, no registra tools y no ejecuta tools. Tampoco llama modelos
+LLM: solo construye un prompt con evidencia ya devuelta por el endpoint.
+
+Primero levantar el endpoint RAG:
+
+```bash
+uvicorn runtime_lab.llm_lab.nucleo_rag_api:app --reload --port 9000
+```
+
+Uso desde CLI:
+
+```bash
+python -m runtime_lab.llm_lab.continue_rag_adapter "que hace dry_run" --top-k 3
+```
+
+La salida es JSON con:
+
+```json
+{
+  "status": "EVIDENCE_FOUND | EVIDENCE_NOT_FOUND | ERROR",
+  "prompt": "string",
+  "evidence": [],
+  "error": null
+}
+```
+
+Si no hay evidencia, `prompt` queda vacio y `status` es
+`EVIDENCE_NOT_FOUND`.
+
 ## 3. Contratos
 
 ### search()
