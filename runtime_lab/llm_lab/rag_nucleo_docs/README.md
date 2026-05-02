@@ -56,3 +56,51 @@ Ejemplo de ejecución determinista:
 ```bash
 python3 -m runtime_lab.llm_lab.rag_nucleo_docs.rag_answer "Qué hace dry_run=True?"
 ```
+
+## Endpoint HTTP local
+
+El RAG tambien puede exponerse como API HTTP de solo lectura desde
+`runtime_lab/llm_lab/nucleo_rag_api.py`.
+
+Este endpoint:
+- devuelve solo evidencia documental
+- reutiliza `rag_nucleo_docs/search.py`
+- no llama modelos LLM
+- no ejecuta tools
+- no importa ni modifica el runtime principal
+
+Levantar el endpoint desde la raiz del repositorio:
+
+```bash
+uvicorn runtime_lab.llm_lab.nucleo_rag_api:app --reload --port 9000
+```
+
+Probar health:
+
+```bash
+curl http://localhost:9000/health
+```
+
+Probar busqueda de evidencia:
+
+```bash
+curl -X POST http://localhost:9000/nucleo-rag/query \
+  -H "Content-Type: application/json" \
+  -d '{"query":"dry_run","top_k":3}'
+```
+
+Contrato de respuesta:
+
+```json
+{
+  "status": "EVIDENCE_FOUND | EVIDENCE_NOT_FOUND | ERROR",
+  "evidence": [
+    {
+      "text": "string",
+      "source": "string",
+      "score": 0.0
+    }
+  ],
+  "error": null
+}
+```
