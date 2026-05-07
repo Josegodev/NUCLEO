@@ -240,19 +240,33 @@ class RuntimeTracingTests(unittest.TestCase):
         self.assertIn("/health", paths)
 
     def test_runtime_audit_ui_cors_is_local_only(self) -> None:
-        cors = next(middleware for middleware in app.user_middleware if middleware.cls is CORSMiddleware)
+        cors_middlewares = [
+            middleware
+            for middleware in app.user_middleware
+            if middleware.cls is CORSMiddleware
+        ]
 
+        self.assertEqual(len(cors_middlewares), 1)
+        cors = cors_middlewares[0]
+        self.assertNotIn("*", cors.kwargs["allow_origins"])
         self.assertEqual(
             cors.kwargs["allow_origins"],
             [
+                "http://127.0.0.1:8765",
+                "http://localhost:8765",
+                "http://127.0.0.1:8766",
+                "http://localhost:8766",
                 "http://127.0.0.1:8767",
                 "http://localhost:8767",
                 "http://127.0.0.1:8080",
                 "http://localhost:8080",
             ],
         )
-        self.assertEqual(cors.kwargs["allow_methods"], ["*"])
-        self.assertEqual(cors.kwargs["allow_headers"], ["*"])
+        self.assertEqual(cors.kwargs["allow_methods"], ["GET", "POST", "OPTIONS"])
+        self.assertEqual(
+            cors.kwargs["allow_headers"],
+            ["Authorization", "Content-Type", "X-Idempotency-Key"],
+        )
 
     def test_policy_denies_registered_tool_not_in_explicit_allowlist(self) -> None:
         decision = PolicyEngine(tool_registry=StaticRegistry(SpyTool(name="spy"))).evaluate(

@@ -1,1 +1,4 @@
 pandas
+
+cd ~/NUCLEO/runtime_lab/recoleccion
+../../.venv/bin/python scripts/calcular_recoleccion.py

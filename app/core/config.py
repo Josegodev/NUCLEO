@@ -34,3 +34,17 @@ API_KEYS = {
         key_name="local_readonly_dev",
     ),
 }
+
+
+LOCAL_UI_CORS_ORIGINS = [
+    "http://127.0.0.1:8765",
+    "http://localhost:8765",
+    "http://127.0.0.1:8766",
+    "http://localhost:8766",
+    "http://127.0.0.1:8767",
+    "http://localhost:8767",
+    "http://127.0.0.1:8080",
+    "http://localhost:8080",
+]
+LOCAL_UI_CORS_METHODS = ["GET", "POST", "OPTIONS"]
+LOCAL_UI_CORS_HEADERS = ["Authorization", "Content-Type", "X-Idempotency-Key"]

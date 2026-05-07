@@ -34,9 +34,12 @@ Notas:
 - Diseñado para ser extensible (reglas más complejas en el futuro)
 
 Limitaciones actuales:
-- No evalúa payload en profundidad
 - No diferencia todavía reglas avanzadas entre dry_run y ejecución real
 - Control de roles aún básico
+
+Contrato actual:
+- Valida el payload contra el contrato de la tool antes de devolver ALLOW
+- No ejecuta acciones; la ejecución sigue perteneciendo al runtime
 
 Arquitectura:
 Capa de control dentro del pipeline:

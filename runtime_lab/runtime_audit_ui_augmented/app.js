@@ -1,124 +1,178 @@
-const API_URL = 'http://127.0.0.1:8000/agent/run';
-const API_KEY_STORAGE_KEY = 'nucleo_runtime_audit.api_key';
+async function run() {
+  const input = document.getElementById("input").value;
+  const dryRun = document.getElementById("dryRun").checked;
 
-let selectedModel = null;
-let dryRun = true;
-let input = '';
-let apiKey = '';
+  const payload = {
+    input: input,
+    agent_mode: "proposal_only",
+    dry_run: dryRun
+  };
 
-const nodes = {
-  input: document.getElementById('input'),
-  apiKey: document.getElementById('apiKey'),
-  rememberApiKey: document.getElementById('rememberApiKey'),
-  dryRun: document.getElementById('dryRun'),
-  runButton: document.getElementById('runButton'),
-  modelTabs: Array.from(document.querySelectorAll('.model-tab')),
-  statusPill: document.getElementById('status-pill'),
-  statusLog: document.getElementById('statusLog'),
-  payloadPreview: document.getElementById('payloadPreview'),
-  errorPanel: document.getElementById('errorPanel'),
-  errorOutput: document.getElementById('errorOutput'),
-  augmentationPanel: document.getElementById('augmentationPanel'),
-  augmentationBadge: document.getElementById('augmentationBadge'),
-  selectedModelOutput: document.getElementById('selectedModelOutput'),
-  augmentationModel: document.getElementById('augmentationModel'),
-  augmentationModelUsed: document.getElementById('augmentationModelUsed'),
-  augmentationFallback: document.getElementById('augmentationFallback'),
-  augmentationFallbackReason: document.getElementById('augmentationFallbackReason'),
-  augmentationProposal: document.getElementById('augmentationProposal'),
-  plannerOutput: document.getElementById('plannerOutput'),
-  policyBadge: document.getElementById('policyBadge'),
-  policyDecision: document.getElementById('policyDecision'),
-  policyOutput: document.getElementById('policyOutput'),
-  executionPanel: document.getElementById('executionPanel'),
-  executionBadge: document.getElementById('executionBadge'),
-  executionExecuted: document.getElementById('executionExecuted'),
-  executionDryRun: document.getElementById('executionDryRun'),
-  executionTool: document.getElementById('executionTool'),
-  executionOutput: document.getElementById('executionOutput'),
-  rawOutput: document.getElementById('rawOutput'),
-};
-
-function setModel(modelId) {
-  selectedModel = modelId || null;
-
-  nodes.modelTabs.forEach((button) => {
-    const isActive = (button.dataset.model || null) === selectedModel;
-    button.classList.toggle('active', isActive);
-    button.setAttribute('aria-selected', String(isActive));
+  const res = await fetch("http://127.0.0.1:8000/agent/run", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
   });
 
-  updatePayloadPreview();
+  const data = await res.json();
+
+  render(data);
 }
 
-function syncState() {
-  input = nodes.input.value.trim();
-  apiKey = nodes.apiKey.value.trim();
-  dryRun = nodes.dryRun.checked;
+
+document.getElementById("augmentation").textContent =
+  JSON.stringify({
+    model_id: result.augmentation?.model_id,
+    ...result.augmentation
+  }, null, 2);
+const model = document.getElementById("model").value;
+
+const payload = {
+  input: input,
+  agent_mode: "proposal_only",
+  dry_run: dryRun,
+  augmentation: model ? { model_id: model } : undefined
+};
+
+function render(data) {
+  document.getElementById("raw").textContent =
+    JSON.stringify(data, null, 2);
+
+  const result = data.result || {};
+
+  // Ajusta estos paths a tu estructura real
+  document.getElementById("augmentation").textContent =
+    JSON.stringify(result.augmentation || {}, null, 2);
+
+  document.getElementById("planner").textContent =
+    JSON.stringify(result.planned_action || {}, null, 2);
+
+  document.getElementById("policy").textContent =
+    JSON.stringify(result.policy_decision || {}, null, 2);
+
+  document.getElementById("execution").textContent =
+    JSON.stringify(result.execution || {}, null, 2);
 }
+const API_URL = 'http://127.0.0.1:8000/agent/run';
+const REQUEST_TIMEOUT_MS = 15000;
+
+const nodes = {
+  userInput: document.getElementById('user-input'),
+  dryRun: document.getElementById('dry-run'),
+  runButton: document.getElementById('run-button'),
+  backendStatus: document.getElementById('backend-status'),
+  requestPreview: document.getElementById('request-preview'),
+  errorPanel: document.getElementById('error-panel'),
+  errorOutput: document.getElementById('error-output'),
+  augmentationBadge: document.getElementById('augmentation-badge'),
+  augmentationMessage: document.getElementById('augmentation-message'),
+  augmentationAction: document.getElementById('augmentation-action'),
+  augmentationFallback: document.getElementById('augmentation-fallback'),
+  augmentationFallbackReason: document.getElementById('augmentation-fallback-reason'),
+  augmentationErrors: document.getElementById('augmentation-errors'),
+  plannerOutput: document.getElementById('planner-output'),
+  policyBadge: document.getElementById('policy-badge'),
+  policyDecision: document.getElementById('policy-decision'),
+  policyOutput: document.getElementById('policy-output'),
+  executionBadge: document.getElementById('execution-badge'),
+  executionExecuted: document.getElementById('execution-executed'),
+  executionResult: document.getElementById('execution-result'),
+  rawOutput: document.getElementById('raw-output')
+};
 
 function buildPayload() {
-  syncState();
-
   return {
-    input,
+    input: nodes.userInput.value.trim(),
     agent_mode: 'proposal_only',
-    dry_run: dryRun,
-    augmentation: selectedModel ? { model_id: selectedModel } : undefined,
+    dry_run: nodes.dryRun.checked
   };
 }
 
-function buildHeaders() {
-  const headers = { 'Content-Type': 'application/json' };
-  const authorization = normalizeAuthorization(apiKey);
-
-  if (authorization) {
-    headers.Authorization = authorization;
-  }
-
-  return headers;
+function updateRequestPreview() {
+  nodes.requestPreview.textContent = stringify(buildPayload());
 }
 
-function normalizeAuthorization(value) {
-  const token = value.trim();
-
-  if (!token) {
-    return null;
+function stringify(value) {
+  if (value === undefined) {
+    return 'undefined';
   }
-
-  if (token.toLowerCase().startsWith('bearer ')) {
-    return `Bearer ${token.slice(7).trim()}`;
-  }
-
-  return `Bearer ${token}`;
+  return JSON.stringify(value, null, 2);
 }
 
-async function run() {
+function setText(node, value) {
+  node.textContent = value === null || value === undefined || value === '' ? '-' : String(value);
+}
+
+function setJson(node, value) {
+  node.textContent = value === undefined ? '-' : stringify(value);
+}
+
+function setBadge(node, label, className) {
+  node.className = `pill ${className}`;
+  node.textContent = label;
+}
+
+function setStatus(label, className) {
+  nodes.backendStatus.className = `status ${className}`;
+  nodes.backendStatus.textContent = label;
+}
+
+function resetOutput() {
+  nodes.errorPanel.classList.add('hidden');
+  nodes.errorOutput.textContent = '';
+  setBadge(nodes.augmentationBadge, 'pending', 'pill-yellow');
+  setText(nodes.augmentationMessage, '-');
+  setJson(nodes.augmentationAction, null);
+  setText(nodes.augmentationFallback, '-');
+  setText(nodes.augmentationFallbackReason, '-');
+  setJson(nodes.augmentationErrors, []);
+  setJson(nodes.plannerOutput, null);
+  setBadge(nodes.policyBadge, 'unknown', 'pill-neutral');
+  setText(nodes.policyDecision, '-');
+  setJson(nodes.policyOutput, null);
+  setBadge(nodes.executionBadge, 'unknown', 'pill-neutral');
+  setText(nodes.executionExecuted, '-');
+  setJson(nodes.executionResult, null);
+  setJson(nodes.rawOutput, null);
+}
+
+function showError(kind, detail) {
+  nodes.errorPanel.classList.remove('hidden');
+  nodes.errorOutput.textContent = stringify({
+    kind,
+    detail
+  });
+  setStatus('error', 'status-error');
+}
+
+async function runRequest() {
   const payload = buildPayload();
-  updatePayloadPreview();
-  persistApiKeyPreference();
-  resetError();
-  resetRender();
+  updateRequestPreview();
+  resetOutput();
 
   if (!payload.input) {
     showError('invalid_input', 'input must not be empty');
     return;
   }
 
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
   nodes.runButton.disabled = true;
   setStatus('running', 'status-running');
-  logStatus(`POST ${API_URL}`);
 
   try {
     const response = await fetch(API_URL, {
       method: 'POST',
-      headers: buildHeaders(),
+      headers: {
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify(payload),
+      signal: controller.signal
     });
 
     const text = await response.text();
     let data;
-
     try {
       data = text ? JSON.parse(text) : null;
     } catch (error) {
@@ -126,132 +180,137 @@ async function run() {
         status: response.status,
         statusText: response.statusText,
         body: text,
-        parserError: error.message,
+        parserError: error.message
       });
       return;
     }
 
-    render(data);
-
     if (!response.ok) {
-      if (response.status === 401) {
-        showError('unauthorized', 'Unauthorized: missing or invalid API key');
-        return;
-      }
-
+      renderResponse(data);
       showError('http_error', {
         status: response.status,
         statusText: response.statusText,
-        response: data,
+        response: data
       });
       return;
     }
 
+    renderResponse(data);
     setStatus('ok', 'status-ok');
-    logStatus(`HTTP ${response.status} ${response.statusText || 'OK'}`);
   } catch (error) {
+    if (error.name === 'AbortError') {
+      showError('timeout', `request exceeded ${REQUEST_TIMEOUT_MS}ms`);
+      return;
+    }
+
     showError('backend_unreachable', error.message || String(error));
   } finally {
+    window.clearTimeout(timeout);
     nodes.runButton.disabled = false;
   }
 }
 
-function render(data) {
-  const sections = extractSections(data);
-
+function renderResponse(response) {
+  const sections = extractSections(response);
   renderAugmentation(sections.augmentation);
-  renderPlanner(sections.planner);
-  renderPolicy(sections.policy);
+  renderPlanner(sections.plannedAction);
+  renderPolicy(sections.policyDecision);
   renderExecution(sections.execution);
-  setJson(nodes.rawOutput, data);
+  setJson(nodes.rawOutput, response);
 }
 
-function extractSections(data) {
-  const result = objectOrEmpty(data?.result);
-  const metadata = objectOrEmpty(result.metadata);
-  const proposal = metadata.proposal || result.proposal || null;
+function extractSections(response) {
+  const result = response && typeof response === 'object' ? response.result || {} : {};
+  const metadata = result && typeof result === 'object' ? result.metadata || {} : {};
 
   return {
-    augmentation: {
-      selected_model: selectedModel || 'default',
-      model_id: metadata.model_id || result.model_id || selectedModel || null,
-      model_used: metadata.model_used || result.model_used || null,
-      backend_used: metadata.backend_used || result.backend_used || metadata.backend || null,
-      fallback_used: metadata.fallback_used ?? result.fallback_used ?? null,
-      fallback_reason: metadata.fallback_reason ?? result.fallback_reason ?? null,
-      validation_errors: metadata.validation_errors || result.validation_errors || [],
-      proposal,
-      model_output: metadata.model_output || result.model_output || null,
-    },
-    planner:
-      data?.planned_action ||
+    augmentation:
+      response?.augmentation ||
+      result.augmentation ||
+      metadata.augmentation ||
+      buildAugmentationFromMetadata(result, metadata),
+    plannedAction:
+      response?.planned_action ||
       result.planned_action ||
       metadata.planned_action ||
-      buildPlannerSummary(result, proposal),
-    policy:
-      data?.policy_decision ||
+      result.plannedAction ||
+      null,
+    policyDecision:
+      response?.policy_decision ||
       result.policy_decision ||
-      result.policy_decision_initial ||
       metadata.policy_decision ||
       null,
-    execution: {
-      status: data?.status || null,
-      executed: result.executed ?? null,
-      dry_run: result.dry_run ?? dryRun,
-      execution_allowed: result.execution_allowed ?? null,
-      execution_state: result.execution_state || null,
-      tool: result.tool || null,
-      payload: result.payload || null,
-      result,
-      errors: data?.errors || [],
-    },
+    execution:
+      response?.execution ||
+      result.execution ||
+      {
+        executed: result.executed,
+        dry_run: result.dry_run,
+        result
+      }
   };
 }
 
-function buildPlannerSummary(result, proposal) {
-  if (!result.tool && !result.payload && !proposal) {
+function buildAugmentationFromMetadata(result, metadata) {
+  const proposal = metadata.proposal || result.proposal || null;
+
+  if (
+    !proposal &&
+    metadata.fallback_used === undefined &&
+    result.fallback_used === undefined
+  ) {
     return null;
   }
 
   return {
-    tool_name: result.tool || proposal?.suggested_action || null,
-    payload: result.payload || proposal?.arguments || null,
-    proposal,
+    assistant_message: proposal?.intent || null,
+    proposed_action: proposal
+      ? {
+        tool_name: proposal.suggested_action || null,
+        arguments: proposal.arguments || {},
+        confidence: proposal.confidence
+      }
+      : null,
+    fallback_used: Boolean(metadata.fallback_used ?? result.fallback_used),
+    fallback_reason: metadata.fallback_reason ?? result.fallback_reason ?? null,
+    validation_errors: metadata.validation_errors || result.validation_errors || []
   };
 }
 
 function renderAugmentation(augmentation) {
-  const fallbackUsed = Boolean(augmentation.fallback_used);
+  if (!augmentation) {
+    setBadge(nodes.augmentationBadge, 'missing', 'pill-neutral');
+    setText(nodes.augmentationMessage, '-');
+    setJson(nodes.augmentationAction, null);
+    setText(nodes.augmentationFallback, '-');
+    setText(nodes.augmentationFallbackReason, '-');
+    setJson(nodes.augmentationErrors, []);
+    return;
+  }
 
-  nodes.augmentationPanel.classList.toggle('panel-fallback', fallbackUsed);
+  const fallbackUsed = Boolean(augmentation.fallback_used);
   setBadge(
     nodes.augmentationBadge,
-    fallbackUsed ? 'fallback' : 'ready',
-    fallbackUsed ? 'pill-red' : 'pill-yellow',
+    fallbackUsed ? 'fallback' : 'accepted',
+    fallbackUsed ? 'pill-red' : 'pill-yellow'
   );
-
-  setText(nodes.selectedModelOutput, augmentation.selected_model);
-  setText(nodes.augmentationModel, augmentation.model_id);
-  setText(nodes.augmentationModelUsed, augmentation.model_used || augmentation.backend_used);
-  setText(nodes.augmentationFallback, augmentation.fallback_used);
+  setText(nodes.augmentationMessage, augmentation.assistant_message);
+  setJson(nodes.augmentationAction, augmentation.proposed_action);
+  setText(nodes.augmentationFallback, fallbackUsed);
   setText(nodes.augmentationFallbackReason, augmentation.fallback_reason);
-  setJson(nodes.augmentationProposal, {
-    proposal: augmentation.proposal,
-    model_output: augmentation.model_output,
-    validation_errors: augmentation.validation_errors,
-  });
+  setJson(nodes.augmentationErrors, augmentation.validation_errors || []);
 }
 
-function renderPlanner(planner) {
-  setJson(nodes.plannerOutput, planner);
+function renderPlanner(plannedAction) {
+  setJson(nodes.plannerOutput, plannedAction);
 }
 
-function renderPolicy(policy) {
-  const rawDecision = policy?.decision;
+function renderPolicy(policyDecision) {
+  const rawDecision = policyDecision?.decision;
   const decision = typeof rawDecision === 'string' ? rawDecision.toUpperCase() : null;
 
   setText(nodes.policyDecision, decision);
-  setJson(nodes.policyOutput, policy);
+  setJson(nodes.policyOutput, policyDecision);
 
   if (decision === 'ALLOW') {
     setBadge(nodes.policyBadge, 'ALLOW', 'pill-green');
@@ -263,152 +322,25 @@ function renderPolicy(policy) {
 }
 
 function renderExecution(execution) {
-  const executed = Boolean(execution.executed);
-  const isDryRun = Boolean(execution.dry_run);
+  const executed = Boolean(execution?.executed);
+  const dryRun = Boolean(execution?.dry_run || execution?.result?.dry_run);
 
-  nodes.executionPanel.classList.toggle('panel-execution', executed);
-  nodes.executionPanel.classList.toggle('panel-dry-run', !executed && isDryRun);
-
-  setText(nodes.executionExecuted, execution.executed);
-  setText(nodes.executionDryRun, execution.dry_run);
-  setText(nodes.executionTool, execution.tool);
-  setJson(nodes.executionOutput, {
-    status: execution.status,
-    execution_allowed: execution.execution_allowed,
-    execution_state: execution.execution_state,
-    payload: execution.payload,
-    result: execution.result,
-    errors: execution.errors,
-  });
+  setText(nodes.executionExecuted, executed);
+  setJson(nodes.executionResult, execution?.result ?? execution ?? null);
 
   if (executed) {
     setBadge(nodes.executionBadge, 'executed', 'pill-green');
-  } else if (isDryRun) {
+  } else if (dryRun) {
     setBadge(nodes.executionBadge, 'dry_run', 'pill-blue');
   } else {
     setBadge(nodes.executionBadge, 'not executed', 'pill-neutral');
   }
 }
 
-function resetRender() {
-  nodes.augmentationPanel.classList.remove('panel-fallback');
-  nodes.executionPanel.classList.remove('panel-execution', 'panel-dry-run');
-  setBadge(nodes.augmentationBadge, 'pending', 'pill-yellow');
-  setText(nodes.selectedModelOutput, selectedModel || 'default');
-  setText(nodes.augmentationModel, '-');
-  setText(nodes.augmentationModelUsed, '-');
-  setText(nodes.augmentationFallback, '-');
-  setText(nodes.augmentationFallbackReason, '-');
-  setJson(nodes.augmentationProposal, null);
-  setJson(nodes.plannerOutput, null);
-  setBadge(nodes.policyBadge, 'unknown', 'pill-neutral');
-  setText(nodes.policyDecision, '-');
-  setJson(nodes.policyOutput, null);
-  setBadge(nodes.executionBadge, 'unknown', 'pill-neutral');
-  setText(nodes.executionExecuted, '-');
-  setText(nodes.executionDryRun, '-');
-  setText(nodes.executionTool, '-');
-  setJson(nodes.executionOutput, null);
-  setJson(nodes.rawOutput, null);
-}
+nodes.runButton.addEventListener('click', runRequest);
+nodes.userInput.addEventListener('input', updateRequestPreview);
+nodes.dryRun.addEventListener('change', updateRequestPreview);
 
-function resetError() {
-  nodes.errorPanel.classList.add('hidden');
-  nodes.errorOutput.textContent = '';
-}
+updateRequestPreview();
+resetOutput();
 
-function showError(kind, detail) {
-  nodes.errorPanel.classList.remove('hidden');
-  nodes.errorOutput.textContent = stringify({ kind, detail });
-  setStatus('error', 'status-error');
-  logStatus(`ERROR ${kind}`);
-}
-
-function updatePayloadPreview() {
-  nodes.payloadPreview.textContent = stringify(buildPayload());
-}
-
-function persistApiKeyPreference() {
-  apiKey = nodes.apiKey.value.trim();
-
-  try {
-    if (nodes.rememberApiKey.checked) {
-      if (apiKey) {
-        localStorage.setItem(API_KEY_STORAGE_KEY, apiKey);
-      } else {
-        localStorage.removeItem(API_KEY_STORAGE_KEY);
-      }
-      return;
-    }
-
-    localStorage.removeItem(API_KEY_STORAGE_KEY);
-  } catch (error) {
-    logStatus('localStorage unavailable');
-  }
-}
-
-function restoreApiKeyPreference() {
-  let storedApiKey;
-
-  try {
-    storedApiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
-  } catch (error) {
-    return;
-  }
-
-  if (!storedApiKey) {
-    return;
-  }
-
-  nodes.apiKey.value = storedApiKey;
-  nodes.rememberApiKey.checked = true;
-}
-
-function logStatus(message) {
-  const time = new Date().toLocaleTimeString();
-  nodes.statusLog.textContent = `${nodes.statusLog.textContent}[${time}] ${message}\n`;
-  nodes.statusLog.scrollTop = nodes.statusLog.scrollHeight;
-}
-
-function setStatus(label, className) {
-  nodes.statusPill.className = `status ${className}`;
-  nodes.statusPill.textContent = label;
-}
-
-function setBadge(node, label, className) {
-  node.className = `pill ${className}`;
-  node.textContent = label;
-}
-
-function setText(node, value) {
-  node.textContent = value === null || value === undefined || value === '' ? '-' : String(value);
-}
-
-function setJson(node, value) {
-  node.textContent = value === null || value === undefined ? '-' : stringify(value);
-}
-
-function stringify(value) {
-  return JSON.stringify(value, null, 2);
-}
-
-function objectOrEmpty(value) {
-  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-}
-
-nodes.runButton.addEventListener('click', run);
-nodes.input.addEventListener('input', updatePayloadPreview);
-nodes.apiKey.addEventListener('input', () => {
-  syncState();
-  persistApiKeyPreference();
-});
-nodes.rememberApiKey.addEventListener('change', persistApiKeyPreference);
-nodes.dryRun.addEventListener('change', updatePayloadPreview);
-nodes.modelTabs.forEach((button) => {
-  button.addEventListener('click', () => setModel(button.dataset.model));
-});
-
-restoreApiKeyPreference();
-setModel(null);
-resetRender();
-logStatus('idle');

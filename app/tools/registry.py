@@ -31,9 +31,8 @@ Notas:
 - Utiliza acceso O(1) mediante diccionario
 
 Limitaciones actuales:
-- No evita sobrescritura de tools con mismo nombre
-- No valida tipos estrictamente
-- No incluye metadata adicional de tools
+- No separa bootstrap-time registration de runtime lookup
+- No incluye metadata operacional adicional de tools
 
 	Arquitectura:
 	Patrón Service Locator dentro del pipeline:

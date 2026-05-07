@@ -14,6 +14,11 @@ HTTP → routes → runtime → policies → tools
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import health, agent, tools
+from app.core.config import (
+    LOCAL_UI_CORS_HEADERS,
+    LOCAL_UI_CORS_METHODS,
+    LOCAL_UI_CORS_ORIGINS,
+)
 
 app = FastAPI(
     title="NUCLEO API",
@@ -25,15 +30,10 @@ app = FastAPI(
 # frontend; it only lets the browser read existing HTTP API responses.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://127.0.0.1:8767",
-        "http://localhost:8767",
-        "http://127.0.0.1:8080",
-        "http://localhost:8080",
-    ],
+    allow_origins=LOCAL_UI_CORS_ORIGINS,
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=LOCAL_UI_CORS_METHODS,
+    allow_headers=LOCAL_UI_CORS_HEADERS,
 )
 
 app.include_router(health.router)
