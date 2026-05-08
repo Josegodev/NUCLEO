@@ -160,6 +160,21 @@ class PolicyToolContractTests(unittest.TestCase):
         self.assertEqual(trace.steps[2].status, "error")
         self.assertFalse(trace.steps[2].output["found"])
 
+    def test_default_policy_engine_uses_runtime_registry(self) -> None:
+        registry = CountingRegistry(None)
+        runtime = AgentRuntime(
+            runtime_planner=StaticPlanner(echo_plan()),
+            tool_registry=registry,
+            runtime_tracer=tracer(),
+        )
+
+        response = runtime.run(request=AgentRequest(dry_run=False), context=context())
+
+        self.assertEqual(response.status, ExecutionStatus.REJECTED)
+        self.assertEqual(response.errors[0].code, ExecutionErrorCode.POLICY_DENIED)
+        self.assertIn("is not registered", response.errors[0].message)
+        self.assertEqual(registry.get_calls, 1)
+
     def test_policy_denies_invalid_echo_payloads(self) -> None:
         cases = [
             {},

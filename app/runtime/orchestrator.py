@@ -76,9 +76,11 @@ class AgentRuntime:
         runtime_augmentation_service: AugmentationService | None = None,
     ) -> None:
         using_default_planner = runtime_planner is None
-        self._planner = runtime_planner or planner
-        self._policy_engine = runtime_policy_engine or policy_engine
         self._registry = tool_registry
+        self._planner = runtime_planner or planner
+        self._policy_engine = runtime_policy_engine or PolicyEngine(
+            tool_registry=self._registry
+        )
         self._tracer = runtime_tracer or tracer
         self._approval_store = runtime_approval_store or approval_store
         self._augmentation_service = (
