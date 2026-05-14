@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="NUCLEO: modelo de gobernanza operacional para LLM soberanos en sistemas de informacion empresariales y educativos.">
+  <title>NUCLEO | Gobernanza operacional para LLM soberanos</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap nav">
+      <a class="brand" href="#top">NUCLEO</a>
+      <nav class="nav-links" aria-label="Navegacion principal">
+        <a href="#problema">Problema</a>
+        <a href="#modelo">Modelo</a>
+        <a href="#prototipo">Prototipo</a>
+        <a href="#metricas">Metricas</a>
+        <a href="#estado">Estado</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero" id="top">
+    <div class="wrap hero-grid">
+      <div>
+        <p class="eyebrow">Sovereign LLM Governance / Operational Authority</p>
+        <h1>Modelo de gobernanza operacional para LLM soberanos</h1>
+        <p class="subtitle">NUCLEO propone una arquitectura stateless, auditable y reproducible para controlar el uso de modelos de lenguaje en sistemas de informacion empresariales y educativos.</p>
+        <p class="tagline">API / AgentRuntime / PolicyEngine / ToolRegistry / Observabilidad / Evaluacion</p>
+        <div class="actions">
+          <a class="button primary" href="#modelo">Ver modelo</a>
+          <a class="button" href="https://github.com/Josegodev/NUCLEO">Repositorio GitHub</a>
+        </div>
+      </div>
+      <aside class="control-panel" aria-label="Panel conceptual de gobernanza operacional">
+        <div class="panel-header">
+          <span>GOVERNANCE STATUS</span>
+          <strong>v0.1 prototype</strong>
+        </div>
+        <div class="panel-metrics">
+          <div>
+            <span>Coste por consulta</span>
+            <strong>medible</strong>
+            <small>baseline pendiente</small>
+          </div>
+          <div>
+            <span>Fuente citada</span>
+            <strong>obligatoria</strong>
+            <small>respuesta evaluable</small>
+          </div>
+          <div>
+            <span>Policy failures</span>
+            <strong>trazables</strong>
+            <small>deny-by-default</small>
+          </div>
+          <div>
+            <span>Prompt injection</span>
+            <strong>testable</strong>
+            <small>golden set</small>
+          </div>
+        </div>
+        <pre><code>Request
+-> Access Control
+-> Evidence Retrieval
+-> AgentRuntime
+-> PolicyEngine
+-> ToolRegistry
+-> Trace + Evaluation</code></pre>
+      </aside>
+    </div>
+  </section>
+
+  <main class="wrap">
+    <section class="section" id="problema">
+      <p class="eyebrow">Problema</p>
+      <div class="statement">
+        <h2>Las organizaciones estan adoptando LLM sin gobernar su operacion.</h2>
+        <p>El problema no es solo la dependencia de un proveedor. Es la perdida de control sobre datos, fuentes, costes, permisos, trazabilidad, evaluacion y seguridad cuando el modelo se integra como una caja negra dentro de procesos reales.</p>
+      </div>
+      <div class="grid three">
+        <article class="card">
+          <h3>Dependencia cerrada</h3>
+          <p>Plataformas externas concentran acceso, ejecucion, datos y costes. La organizacion usa el modelo, pero no controla completamente el sistema operacional que lo rodea.</p>
+        </article>
+        <article class="card">
+          <h3>Baja trazabilidad</h3>
+          <p>Sin trazas claras no se puede reconstruir que prompt, fuente, tool, politica o modelo produjo una respuesta o una accion.</p>
+        </article>
+        <article class="card">
+          <h3>Evaluacion debil</h3>
+          <p>La calidad suele medirse por impresion. Faltan golden sets, metricas de evidencia, pruebas de seguridad y seguimiento de coste y latencia.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="hipotesis">
+      <p class="eyebrow">Hipotesis</p>
+      <div class="hypothesis">
+        <p>Una arquitectura stateless, auditable y reproducible puede mejorar el control organizacional sobre el uso de LLM.</p>
+        <p>El valor no esta solo en el modelo. El valor esta en gobernar la operacion: politicas, permisos, fuentes, herramientas, logs, evaluacion y trazas.</p>
+      </div>
+    </section>
+
+    <section class="section" id="modelo">
+      <p class="eyebrow">Modelo de gobernanza</p>
+      <h2>NUCLEO estructura el uso de LLM como un sistema gobernado, no como un chatbot.</h2>
+      <div class="governance-grid">
+        <article class="module">
+          <span>01</span>
+          <h3>Acceso</h3>
+          <p>Identidad, rol, contexto y limites de consulta antes de recuperar informacion o invocar herramientas.</p>
+        </article>
+        <article class="module">
+          <span>02</span>
+          <h3>Fuentes</h3>
+          <p>Respuestas apoyadas en documentacion verificable, con distincion explicita entre evidencia suficiente y ausencia de evidencia.</p>
+        </article>
+        <article class="module">
+          <span>03</span>
+          <h3>Politicas</h3>
+          <p>Reglas de ejecucion y autorizacion separadas del modelo. El LLM puede proponer; la policy decide.</p>
+        </article>
+        <article class="module">
+          <span>04</span>
+          <h3>Herramientas</h3>
+          <p>ToolRegistry como frontera de capacidades: solo se ejecutan tools registradas, contratadas y autorizadas.</p>
+        </article>
+        <article class="module">
+          <span>05</span>
+          <h3>Observabilidad</h3>
+          <p>Logs, trace_id, estado de ejecucion, errores, decisiones de policy y contexto operativo por consulta.</p>
+        </article>
+        <article class="module">
+          <span>06</span>
+          <h3>Evaluacion</h3>
+          <p>Golden set, ataques de prompt injection, fuga de datos, calidad de respuesta, coste, latencia y cobertura de fuentes.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" id="prototipo">
+      <p class="eyebrow">Prototipo</p>
+      <div class="split">
+        <div>
+          <h2>NUCLEO es la implementacion experimental del modelo.</h2>
+          <p>El repositorio implementa un runtime modular sobre FastAPI para separar decision, validacion y ejecucion. Su objetivo es probar que una organizacion puede operar LLM con mas control, menos opacidad y una base metodologica evaluable.</p>
+        </div>
+        <div class="card stack-card">
+          <h3>Componentes del prototipo</h3>
+          <ul class="plain-list">
+            <li>API de acceso y autenticacion por request</li>
+            <li>AgentRuntime como capa de orquestacion</li>
+            <li>Planner para propuestas controladas</li>
+            <li>PolicyEngine con comportamiento deny-by-default</li>
+            <li>ToolRegistry para herramientas disponibles</li>
+            <li>Approval gate para separar propuesta y ejecucion</li>
+            <li>Observabilidad y trazas internas</li>
+            <li>Evaluacion mediante casos y pruebas</li>
+          </ul>
+        </div>
+      </div>
+      <div class="pipeline">
+        <div>API</div>
+        <div>AgentRuntime</div>
+        <div>Planner</div>
+        <div>PolicyEngine</div>
+        <div>ToolRegistry</div>
+        <div>Observability</div>
+        <div>Evaluation</div>
+      </div>
+    </section>
+
+    <section class="section use-case">
+      <p class="eyebrow">Caso de uso inicial</p>
+      <div class="case-layout">
+        <div>
+          <h2>Asistente documental para universidad, LMS o empresa.</h2>
+          <p>El primer caso de uso es un asistente documental gobernado: consulta de documentacion interna, control de acceso, respuesta con fuentes, logs de ejecucion y evaluacion periodica.</p>
+        </div>
+        <div class="evidence-box">
+          <div class="evidence-row">
+            <span>Usuario</span>
+            <strong>rol / permisos / contexto</strong>
+          </div>
+          <div class="evidence-row">
+            <span>Respuesta</span>
+            <strong>con fuente o sin evidencia suficiente</strong>
+          </div>
+          <div class="evidence-row">
+            <span>Registro</span>
+            <strong>trace_id / policy / tool / errores</strong>
+          </div>
+          <div class="evidence-row">
+            <span>Evaluacion</span>
+            <strong>golden set / seguridad / calidad</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="metricas">
+      <p class="eyebrow">Metricas</p>
+      <h2>Lo que no se mide no se gobierna.</h2>
+      <p class="section-lead">Estas metricas definen la evaluacion del caso de uso. No se publican valores inventados: el prototipo debe generar el baseline de forma reproducible.</p>
+      <div class="metric-table" role="table" aria-label="Metricas de evaluacion NUCLEO">
+        <div role="row">
+          <strong>Coste por consulta</strong>
+          <span>Control economico y comparacion entre proveedores o modelos.</span>
+        </div>
+        <div role="row">
+          <strong>Latencia</strong>
+          <span>Tiempo de respuesta por consulta, ruta y backend.</span>
+        </div>
+        <div role="row">
+          <strong>Tasa de respuestas con fuente</strong>
+          <span>Porcentaje de respuestas apoyadas en evidencia documental.</span>
+        </div>
+        <div role="row">
+          <strong>Fallos de politica</strong>
+          <span>Intentos bloqueados, denegaciones y acciones fuera de contrato.</span>
+        </div>
+        <div role="row">
+          <strong>Resistencia a prompt injection</strong>
+          <span>Pruebas adversariales contra instrucciones maliciosas o contradictorias.</span>
+        </div>
+        <div role="row">
+          <strong>Fuga de datos</strong>
+          <span>Deteccion de exposicion no autorizada de informacion sensible.</span>
+        </div>
+        <div role="row">
+          <strong>Calidad en golden set</strong>
+          <span>Evaluacion recurrente sobre preguntas y respuestas esperadas.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="estado">
+      <p class="eyebrow">Resultado esperado</p>
+      <div class="grid three">
+        <article class="card outcome">
+          <h3>Marco metodologico</h3>
+          <p>Un esquema operativo para evaluar y gobernar LLM en organizaciones, separando acceso, fuentes, politicas, tools y evaluacion.</p>
+        </article>
+        <article class="card outcome">
+          <h3>Prototipo reproducible</h3>
+          <p>Una base FastAPI verificable que demuestra el pipeline de control y permite evolucionar hacia casos documentales reales.</p>
+        </article>
+        <article class="card outcome">
+          <h3>Caso evaluado</h3>
+          <p>Un asistente documental para entorno universitario, LMS o empresa con metricas tecnicas, operativas y de seguridad.</p>
+        </article>
+      </div>
+      <div class="status-note">
+        <strong>Estado actual:</strong> prototipo avanzado y experimental. No debe presentarse como producto de produccion ni como garantia de cumplimiento normativo. Su contribucion es metodologica y tecnica: convertir el uso de LLM en una operacion observable, reproducible y evaluable.
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-grid">
+      <span>NUCLEO / Gobernanza operacional para LLM soberanos</span>
+      <a href="https://github.com/Josegodev/NUCLEO">github.com/Josegodev/NUCLEO</a>
+    </div>
+  </footer>
+</body>
+</html>
